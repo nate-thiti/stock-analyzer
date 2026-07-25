@@ -15,7 +15,12 @@ import {
   ArrowDownRight,
   Activity,
   Layers,
-  Percent
+  Percent,
+  Upload,
+  Download,
+  FileText,
+  LineChart,
+  PieChart
 } from 'lucide-react';
 
 const API_BASE_URL = 'http://localhost:8010/api';
@@ -40,6 +45,19 @@ function App() {
   const [interval, setInterval] = useState('15m');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Analysis states
+  const [analysis, setAnalysis] = useState(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [csvFile, setCsvFile] = useState(null);
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [savedAnalyses, setSavedAnalyses] = useState([]);
+  
+  // Batch analysis states
+  const [batchSymbols, setBatchSymbols] = useState('');
+  const [batchResults, setBatchResults] = useState([]);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [showBatchResults, setShowBatchResults] = useState(false);
 
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
@@ -75,6 +93,43 @@ function App() {
   useEffect(() => {
     fetchStockData(currentSymbol);
   }, [currentSymbol, period, interval]);
+
+  // Load saved analyses from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('stockAnalyses');
+    if (saved) {
+      setSavedAnalyses(JSON.parse(saved));
+    }
+  }, []);
+
+  // Save analysis to localStorage
+  const saveAnalysis = (analysisData) => {
+    const newAnalysis = {
+      ...analysisData,
+      savedAt: new Date().toISOString()
+    };
+    const updated = [...savedAnalyses.filter(a => a.symbol !== analysisData.symbol), newAnalysis];
+    setSavedAnalyses(updated);
+    localStorage.setItem('stockAnalyses', JSON.stringify(updated));
+  };
+
+  // Load saved analysis
+  const loadSavedAnalysis = (symbol) => {
+    const saved = savedAnalyses.find(a => a.symbol === symbol);
+    if (saved) {
+      setAnalysis(saved);
+      setShowAnalysis(true);
+      setSearchSymbol(symbol);
+      setCurrentSymbol(symbol);
+    }
+  };
+
+  // Delete saved analysis
+  const deleteSavedAnalysis = (symbol) => {
+    const updated = savedAnalyses.filter(a => a.symbol !== symbol);
+    setSavedAnalyses(updated);
+    localStorage.setItem('stockAnalyses', JSON.stringify(updated));
+  };
 
   // วาดกราฟ TradingView Lightweight Chart
   useEffect(() => {
@@ -167,6 +222,130 @@ function App() {
     setCurrentSymbol(sym);
   };
 
+  // CSV Import
+  const handleCSVImport = async (e) => {
+    e.preventDefault();
+    if (!csvFile) return;
+
+    setAnalysisLoading(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const csvData = event.target.result;
+      try {
+        const response = await fetch(`${API_BASE_URL}/csv/import`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol: currentSymbol,
+            csv_data: csvData
+          })
+        });
+        
+        if (!response.ok) throw new Error('Failed to import CSV');
+        
+        const result = await response.json();
+        setAnalysis(result);
+        setShowAnalysis(true);
+        saveAnalysis(result); // Auto-save to localStorage
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setAnalysisLoading(false);
+      }
+    };
+    reader.readAsText(csvFile);
+  };
+
+  // CSV Export
+  const handleCSVExport = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/csv/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: currentSymbol,
+          period: period,
+          interval: interval
+        })
+      });
+      
+      if (!response.ok) throw new Error('Failed to export CSV');
+      
+      const result = await response.json();
+      
+      // Download CSV file
+      const blob = new Blob([result.csv_data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentSymbol}_${period}_${interval}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // Full Analysis
+  const handleFullAnalysis = async () => {
+    setAnalysisLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/analysis/full?symbol=${currentSymbol}&period=${period}&interval=${interval}`);
+      
+      if (!response.ok) throw new Error('Failed to perform analysis');
+      
+      const result = await response.json();
+      setAnalysis(result);
+      setShowAnalysis(true);
+      saveAnalysis(result); // Auto-save to localStorage
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAnalysisLoading(false);
+    }
+  };
+
+  // Batch Analysis
+  const handleBatchAnalysis = async () => {
+    const symbols = batchSymbols.split(',').map(s => s.trim()).filter(s => s);
+    if (symbols.length === 0) {
+      setError('กรุณาระบุสัญลักษณ์หุ้นอย่างน้อย 1 ตัว');
+      return;
+    }
+
+    setBatchLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/analysis/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbols: symbols,
+          period: period,
+          interval: interval
+        })
+      });
+      
+      if (!response.ok) throw new Error('Failed to perform batch analysis');
+      
+      const result = await response.json();
+      setBatchResults(result.results);
+      setShowBatchResults(true);
+      
+      // Save all results to localStorage
+      result.results.forEach(item => {
+        if (!item.error) {
+          saveAnalysis(item);
+        }
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
   const formatMarketCap = (num) => {
     if (!num) return '-';
     if (num >= 1.0e12) return (num / 1.0e12).toFixed(2) + 'T';
@@ -181,12 +360,12 @@ function App() {
       <header className="border-b border-border bg-card/65 backdrop-blur-md sticky top-0 z-50 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="bg-primary/10 p-2.5 rounded-xl text-primary border border-primary/20 shadow-lg shadow-primary/5">
-              <Activity size={22} className="animate-pulse" />
+            <div className="bg-gradient-primary p-2.5 rounded-xl text-white shadow-lg shadow-blue-500/20 animate-glow">
+              <Activity size={22} className="icon-animate" />
             </div>
             <div>
               <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                ANTIGRAVITY <span className="text-primary font-medium text-xs bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">STOCKS</span>
+                <span className="text-gradient">ANTIGRAVITY</span> <span className="text-primary font-medium text-xs bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">STOCKS</span>
               </h1>
               <p className="text-[10px] text-gray-400 font-mono tracking-wider uppercase">Global Market Intelligence</p>
             </div>
@@ -345,6 +524,86 @@ function App() {
                 <span>ข้อมูลจาก Yahoo Finance • อ้างอิงเวลาเซิร์ฟเวอร์</span>
               </div>
 
+              {/* CSV Import/Export & Analysis Buttons */}
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  onClick={handleCSVExport}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#0F1322] border border-border rounded-xl text-xs font-medium text-gray-300 hover:border-primary hover:text-white transition-all btn-hover"
+                >
+                  <Download size={14} className="icon-animate" />
+                  Export CSV
+                </button>
+                
+                <button
+                  onClick={() => document.getElementById('csvInput').click()}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#0F1322] border border-border rounded-xl text-xs font-medium text-gray-300 hover:border-primary hover:text-white transition-all btn-hover"
+                >
+                  <Upload size={14} className="icon-animate" />
+                  Import CSV
+                </button>
+                <input
+                  id="csvInput"
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => setCsvFile(e.target.files[0])}
+                  className="hidden"
+                />
+                
+                {csvFile && (
+                  <button
+                    onClick={handleCSVImport}
+                    disabled={analysisLoading}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-primary border border-primary rounded-xl text-xs font-medium text-white hover:opacity-90 transition-all btn-hover disabled:opacity-50"
+                  >
+                    <FileText size={14} className="icon-animate" />
+                    {analysisLoading ? 'Analyzing...' : 'Analyze CSV'}
+                  </button>
+                )}
+                
+                <button
+                  onClick={handleFullAnalysis}
+                  disabled={analysisLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/30 rounded-xl text-xs font-medium text-primary hover:bg-primary/20 transition-all btn-hover disabled:opacity-50"
+                >
+                  <LineChart size={14} className="icon-animate" />
+                  {analysisLoading ? 'Analyzing...' : 'Full Analysis'}
+                </button>
+              </div>
+
+              {/* Batch Analysis Section */}
+              <div className="mt-6 pt-6 border-t border-border/40">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Layers size={14} className="text-primary icon-animate" />
+                  Batch Analysis (วิเคราะห์หลายหุ้นพร้อมกัน)
+                </h4>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="ใส่สัญลักษณ์หุ้นคั่นด้วยจุลภาค เช่น AAPL,TSLA,GOOGL"
+                    value={batchSymbols}
+                    onChange={(e) => setBatchSymbols(e.target.value)}
+                    className="flex-1 bg-[#0F1322] border border-border rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                  />
+                  <button
+                    onClick={handleBatchAnalysis}
+                    disabled={batchLoading || !batchSymbols.trim()}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-primary border border-primary rounded-xl text-xs font-medium text-white hover:opacity-90 transition-all btn-hover disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {batchLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full icon-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <LineChart size={14} className="icon-animate" />
+                        Analyze All
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>
 
@@ -448,6 +707,237 @@ function App() {
                 </li>
               </ul>
             </div>
+
+            {/* Saved Analyses */}
+            {savedAnalyses.length > 0 && (
+              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <FileText size={14} className="text-primary" />
+                  การวิเคราะห์ที่บันทึกไว้ ({savedAnalyses.length})
+                </h4>
+                <div className="space-y-2">
+                  {savedAnalyses.map((saved) => (
+                    <div key={saved.symbol} className="flex items-center justify-between bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-mono font-bold text-white">{saved.symbol}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          saved.recommendation === 'buy' ? 'bg-success/10 text-success' :
+                          saved.recommendation === 'sell' ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning'
+                        }`}>
+                          {saved.recommendation?.toUpperCase()}
+                        </span>
+                        <span className="text-[10px] text-gray-500">
+                          {new Date(saved.savedAt).toLocaleDateString('th-TH')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => loadSavedAnalysis(saved.symbol)}
+                          className="text-[10px] text-primary hover:text-white transition-colors"
+                        >
+                          โหลด
+                        </button>
+                        <button
+                          onClick={() => deleteSavedAnalysis(saved.symbol)}
+                          className="text-[10px] text-danger hover:text-red-400 transition-colors"
+                        >
+                          ลบ
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Batch Analysis Results */}
+            {showBatchResults && batchResults.length > 0 && (
+              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Layers size={14} className="text-primary" />
+                  ผลการวิเคราะห์แบบ Batch ({batchResults.length})
+                </h4>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {batchResults.map((result) => (
+                    <div key={result.symbol} className={`flex items-center justify-between p-3 rounded-xl border ${
+                      result.error 
+                        ? 'bg-danger/5 border-danger/20' 
+                        : 'bg-[#0F1322]/40 border-border/30'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-mono font-bold text-white">{result.symbol}</span>
+                        {result.error ? (
+                          <span className="text-[10px] text-danger">{result.error}</span>
+                        ) : (
+                          <>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                              result.recommendation === 'buy' ? 'bg-success/10 text-success' :
+                              result.recommendation === 'sell' ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning'
+                            }`}>
+                              {result.recommendation?.toUpperCase()}
+                            </span>
+                            <span className="text-[10px] text-gray-400">
+                              {Math.round(result.confidence * 100)}%
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {!result.error && (
+                        <button
+                          onClick={() => loadSavedAnalysis(result.symbol)}
+                          className="text-[10px] text-primary hover:text-white transition-colors"
+                        >
+                          ดูรายละเอียด
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Analysis Results */}
+            {showAnalysis && analysis && (
+              <div className="space-y-6 animate-fadeIn">
+                {/* Recommendation Card */}
+                <div className={`bg-card border rounded-2xl p-6 shadow-sm ${
+                  analysis.recommendation === 'buy' ? 'border-success/30' :
+                  analysis.recommendation === 'sell' ? 'border-danger/30' : 'border-warning/30'
+                }`}>
+                  <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                    <PieChart size={16} className="text-primary" />
+                    คำแนะนำการลงทุน
+                  </h3>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className={`text-2xl font-black ${
+                        analysis.recommendation === 'buy' ? 'text-success' :
+                        analysis.recommendation === 'sell' ? 'text-danger' : 'text-warning'
+                      }`}>
+                        {analysis.recommendation?.toUpperCase()}
+                      </span>
+                      <p className="text-xs text-gray-400 mt-1">ความมั่นใจ: {(analysis.confidence * 100).toFixed(0)}%</p>
+                    </div>
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                      analysis.recommendation === 'buy' ? 'bg-success/10' :
+                      analysis.recommendation === 'sell' ? 'bg-danger/10' : 'bg-warning/10'
+                    }`}>
+                      {analysis.recommendation === 'buy' ? <TrendingUp size={24} className="text-success" /> :
+                       analysis.recommendation === 'sell' ? <TrendingDown size={24} className="text-danger" /> :
+                       <Activity size={24} className="text-warning" />}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fundamental Analysis */}
+                {analysis.fundamental && (
+                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                    <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                      <Building2 size={16} className="text-primary" />
+                      Fundamental Analysis
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">P/E Ratio</p>
+                        <p className="text-xs font-mono font-bold text-white mt-1">{analysis.fundamental.pe_ratio?.toFixed(2) || '-'}</p>
+                      </div>
+                      <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">PEG Ratio</p>
+                        <p className="text-xs font-mono font-bold text-white mt-1">{analysis.fundamental.peg_ratio?.toFixed(2) || '-'}</p>
+                      </div>
+                      <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">P/S Ratio</p>
+                        <p className="text-xs font-mono font-bold text-white mt-1">{analysis.fundamental.ps_ratio?.toFixed(2) || '-'}</p>
+                      </div>
+                      <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">P/B Ratio</p>
+                        <p className="text-xs font-mono font-bold text-white mt-1">{analysis.fundamental.pb_ratio?.toFixed(2) || '-'}</p>
+                      </div>
+                      <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">ROE</p>
+                        <p className="text-xs font-mono font-bold text-white mt-1">{analysis.fundamental.roe?.toFixed(2) || '-'}</p>
+                      </div>
+                      <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">Debt/Equity</p>
+                        <p className="text-xs font-mono font-bold text-white mt-1">{analysis.fundamental.debt_to_equity?.toFixed(2) || '-'}</p>
+                      </div>
+                      <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">Revenue Growth</p>
+                        <p className="text-xs font-mono font-bold text-white mt-1">{analysis.fundamental.revenue_growth?.toFixed(2) || '-'}</p>
+                      </div>
+                      <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">Earnings Growth</p>
+                        <p className="text-xs font-mono font-bold text-white mt-1">{analysis.fundamental.earnings_growth?.toFixed(2) || '-'}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Technical Analysis */}
+                {analysis.technical && (
+                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                    <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                      <LineChart size={16} className="text-primary" />
+                      Technical Analysis
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">RSI Signal</p>
+                        <p className={`text-xs font-bold mt-1 ${
+                          analysis.technical.rsi_signal === 'buy' ? 'text-success' :
+                          analysis.technical.rsi_signal === 'sell' ? 'text-danger' : 'text-warning'
+                        }`}>
+                          {analysis.technical.rsi_signal?.toUpperCase() || 'NEUTRAL'}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                          <p className="text-[10px] text-gray-400 font-bold uppercase">Support Levels</p>
+                          <p className="text-xs font-mono font-bold text-white mt-1">
+                            {analysis.technical.support_levels?.slice(0, 3).join(', ') || '-'}
+                          </p>
+                        </div>
+                        <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                          <p className="text-[10px] text-gray-400 font-bold uppercase">Resistance Levels</p>
+                          <p className="text-xs font-mono font-bold text-white mt-1">
+                            {analysis.technical.resistance_levels?.slice(0, 3).join(', ') || '-'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Trend Analysis */}
+                {analysis.trend && (
+                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                    <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                      <Activity size={16} className="text-primary" />
+                      Trend Analysis
+                    </h3>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">Trend</p>
+                        <p className={`text-xs font-bold mt-1 ${
+                          analysis.trend.trend_direction === 'uptrend' ? 'text-success' :
+                          analysis.trend.trend_direction === 'downtrend' ? 'text-danger' : 'text-warning'
+                        }`}>
+                          {analysis.trend.trend_direction?.toUpperCase()}
+                        </p>
+                      </div>
+                      <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">Strength</p>
+                        <p className="text-xs font-bold text-white mt-1">{analysis.trend.trend_strength?.toUpperCase()}</p>
+                      </div>
+                      <div className="bg-[#0F1322]/40 p-3 rounded-xl border border-border/30">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase">Volume</p>
+                        <p className="text-xs font-bold text-white mt-1">{analysis.trend.volume_trend?.toUpperCase()}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
         </div>
