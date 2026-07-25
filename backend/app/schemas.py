@@ -10,6 +10,9 @@ class StockQuote(BaseModel):
     currency: str
     exchange: str
     market_time: str
+    market_state: Optional[str] = None
+    exchange_timezone: Optional[str] = None
+    fetched_at: Optional[str] = None
 
 class StockHistoryItem(BaseModel):
     time: str
@@ -31,15 +34,28 @@ class StockInfo(BaseModel):
     industry: Optional[str] = None
     sector: Optional[str] = None
     pe_ratio: Optional[float] = None
+    forward_pe: Optional[float] = None
+    peg_ratio: Optional[float] = None
+    ps_ratio: Optional[float] = None
+    pb_ratio: Optional[float] = None
+    roe: Optional[float] = None
+    debt_to_equity: Optional[float] = None
+    current_ratio: Optional[float] = None
+    profit_margin: Optional[float] = None
+    revenue_growth: Optional[float] = None
+    earnings_growth: Optional[float] = None
     market_cap: Optional[float] = None
     dividend_yield: Optional[float] = None
+    beta: Optional[float] = None
     fifty_two_week_high: Optional[float] = None
     fifty_two_week_low: Optional[float] = None
+    currency: Optional[str] = None
+    exchange: Optional[str] = None
 
-# Fundamental Analysis Schemas
 class FundamentalAnalysis(BaseModel):
     symbol: str
     pe_ratio: Optional[float] = None
+    forward_pe: Optional[float] = None
     peg_ratio: Optional[float] = None
     ps_ratio: Optional[float] = None
     pb_ratio: Optional[float] = None
@@ -52,13 +68,8 @@ class FundamentalAnalysis(BaseModel):
     net_margin: Optional[float] = None
     revenue_growth: Optional[float] = None
     earnings_growth: Optional[float] = None
+    valuation_grade: Optional[str] = None
     analysis_date: str
-
-# Technical Analysis Schemas
-class TechnicalIndicator(BaseModel):
-    name: str
-    values: List[Optional[float]]
-    signal: Optional[str] = None  # "buy", "sell", "neutral"
 
 class TechnicalAnalysis(BaseModel):
     symbol: str
@@ -79,30 +90,123 @@ class TechnicalAnalysis(BaseModel):
     resistance_levels: List[float]
     timestamps: List[str]
 
-# Trend Analysis Schemas
 class TrendAnalysis(BaseModel):
     symbol: str
-    trend_direction: str  # "uptrend", "downtrend", "sideways"
-    trend_strength: str  # "strong", "moderate", "weak"
-    volume_trend: str  # "increasing", "decreasing", "stable"
-    price_pattern: Optional[str] = None  # "head_and_shoulders", "double_top", etc.
-    key_levels: Dict[str, float]
+    trend_direction: str
+    trend_strength: str
+    volume_trend: str
+    price_pattern: Optional[str] = None
+    key_levels: Dict[str, Optional[float]]
     analysis_date: str
 
-# CSV Import/Export Schemas
+class TradingPlan(BaseModel):
+    action: str
+    confidence: float
+    reasons: List[str] = []
+    score: float = 0
+    entry_price: Optional[float] = None
+    target_price: Optional[float] = None
+    stop_loss: Optional[float] = None
+    stop_loss_pct: Optional[float] = None
+    stop_loss_method: Optional[str] = None
+    position_size_shares: int = 0
+    position_size_amount: float = 0
+    portfolio_allocation_pct: float = 0
+    dca_splits: List[Dict[str, Any]] = []
+    risk_reward_ratio: Optional[float] = None
+    atr: Optional[float] = None
+    account_size: float = 100_000
+    risk_pct: float = 2.0
+    currency: str = "USD"
+    summary: str = ""
+    plan_date: str = ""
+    detailed_analysis: str = ""
+    fundamental_notes: List[str] = []
+    technical_notes: List[str] = []
+    risk_notes: List[str] = []
+
+class AnalysisResponse(BaseModel):
+    symbol: str
+    current_price: Optional[float] = None
+    currency: Optional[str] = None
+    fundamental: Optional[FundamentalAnalysis] = None
+    technical: Optional[TechnicalAnalysis] = None
+    trend: Optional[TrendAnalysis] = None
+    recommendation: Optional[str] = None
+    confidence: Optional[float] = None
+    trading_plan: Optional[TradingPlan] = None
+
+class ComparisonResponse(BaseModel):
+    symbols: List[str]
+    results: List[AnalysisResponse]
+    best_pick: Optional[str] = None
+    summary: Optional[str] = None
+
+
+class SignalItem(BaseModel):
+    symbol: str
+    name: Optional[str] = None
+    current_price: Optional[float] = None
+    currency: Optional[str] = "USD"
+    change_percent: Optional[float] = None
+    recommendation: str
+    confidence: float = 0
+    score: float = 0
+
+
+class MarketSignalsResponse(BaseModel):
+    buy: List[SignalItem] = []
+    hold: List[SignalItem] = []
+    sell: List[SignalItem] = []
+    scanned: int = 0
+    updated_at: str = ""
+    scope_used: str = "global"
+
+
 class CSVImportRequest(BaseModel):
     symbol: str
-    csv_data: str  # CSV string
+    csv_data: str
 
 class CSVExportRequest(BaseModel):
     symbol: str
     period: str = "1mo"
     interval: str = "1d"
 
-class AnalysisResponse(BaseModel):
+class BatchAnalysisRequest(BaseModel):
+    symbols: List[str]
+    period: str = "6mo"
+    interval: str = "1d"
+    account_size: float = 100_000
+    risk_pct: float = 2.0
+
+class SearchResult(BaseModel):
     symbol: str
-    fundamental: Optional[FundamentalAnalysis] = None
-    technical: Optional[TechnicalAnalysis] = None
-    trend: Optional[TrendAnalysis] = None
-    recommendation: Optional[str] = None  # "buy", "sell", "hold"
-    confidence: Optional[float] = None
+    name: Optional[str] = None
+    exchange: Optional[str] = None
+    type: Optional[str] = None
+
+
+class QuarterlyFundamentalItem(BaseModel):
+    fiscal_date: str
+    revenue: Optional[float] = None
+    net_income: Optional[float] = None
+    eps: Optional[float] = None
+    gross_margin: Optional[float] = None
+    net_margin: Optional[float] = None
+
+
+class QuarterlyFundamentalsResponse(BaseModel):
+    symbol: str
+    quarters: List[QuarterlyFundamentalItem]
+
+
+class ValuationHistoryItem(BaseModel):
+    time: str
+    price: float
+    pe_ratio: Optional[float] = None
+
+
+class ValuationHistoryResponse(BaseModel):
+    symbol: str
+    period: str
+    history: List[ValuationHistoryItem]

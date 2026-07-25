@@ -1,16 +1,37 @@
-version: '3.8'
-
 services:
   backend:
     build: ./backend
     ports:
       - "8010:8010"
     restart: always
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: sqlite:////data/app.db
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      APP_ENV: ${APP_ENV:-development}
+      SUPERADMIN_USERNAME: ${SUPERADMIN_USERNAME:-admin}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-admin@example.com}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-admin1234}
+    volumes:
+      - app-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   frontend:
     build: ./frontend
     ports:
       - "3010:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: always
+
+volumes:
+  app-data:

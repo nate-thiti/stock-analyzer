@@ -1,5 +1,11 @@
 fastapi
 uvicorn
 pandas
+numpy
 pydantic
-requests
+pydantic[email]
+yfinance
+sqlalchemy
+bcrypt
+python-jose[cryptography]
+python-multipart

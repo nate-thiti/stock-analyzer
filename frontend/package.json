@@ -7,13 +7,16 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
+    "test": "node --test src/utils/chartIndicators.test.js",
     "preview": "vite preview"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.0",
     "lucide-react": "^1.26.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.6.2",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",

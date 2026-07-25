@@ -1,240 +1,414 @@
-import requests
+import yfinance as yf
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 import time
-import random
 import threading
-import os
 from typing import Dict, Any, Optional, List
 from .schemas import StockQuote, StockHistoryItem, StockInfo
+from .fundamentals import RawFinancials, compute_fundamentals
 
-# Twelve Data API Configuration
-TWELVE_DATA_API_KEY = os.getenv('TWELVE_DATA_API_KEY', '3ba11a95538c4b73a9e1d9c262fa43dc')
-TWELVE_DATA_BASE_URL = 'https://api.twelvedata.com'
+QUOTE_CACHE_EXPIRY = 30
+HISTORY_CACHE_EXPIRY = 300
+RAW_CACHE_EXPIRY = 1800
 
-# สร้าง Session พร้อมกำหนด User-Agent
-session = requests.Session()
-session.headers.update({
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'application/json',
-    'Accept-Language': 'en-US,en;q=0.5',
-})
-
-# Rate limiting settings (Twelve Data: 800 requests/day)
-MIN_DELAY = 2.0  # วินาที
-MAX_DELAY = 5.0  # วินาที
-MAX_RETRIES = 3
-
-last_request_time = 0
-request_lock = threading.Lock()
-
-def rate_limit():
-    """ป้องกันการ request ถี่เกินไป"""
-    global last_request_time
-    with request_lock:
-        current_time = time.time()
-        time_since_last = current_time - last_request_time
-        
-        if time_since_last < MIN_DELAY:
-            sleep_time = MIN_DELAY - time_since_last + random.uniform(0, 1.0)
-            time.sleep(sleep_time)
-        
-        last_request_time = time.time()
-
-def retry_with_backoff(func, *args, max_retries=MAX_RETRIES, **kwargs):
-    """Retry ด้วย exponential backoff"""
-    for attempt in range(max_retries):
-        try:
-            rate_limit()
-            return func(*args, **kwargs)
-        except Exception as e:
-            if attempt == max_retries - 1:
-                raise
-            wait_time = (2 ** attempt) + random.uniform(0, 1)
-            print(f"Retry {attempt + 1}/{max_retries} after {wait_time:.1f}s: {e}")
-            time.sleep(wait_time)
-    return None
-
-# ระบบ Cache ง่ายๆ เพื่อป้องกันการโหลดซ้ำในเวลา 5 นาที (300 วินาที)
-CACHE_EXPIRY = 300
 quote_cache: Dict[str, Dict[str, Any]] = {}
-info_cache: Dict[str, Dict[str, Any]] = {}
-history_cache: Dict[str, Dict[str, Any]] = {}  # key format: {symbol}_{period}_{interval}
+raw_cache: Dict[str, Dict[str, Any]] = {}
+history_cache: Dict[str, Dict[str, Any]] = {}
+_ticker_cache: Dict[str, Any] = {}
+_inflight_raw: Dict[str, threading.Event] = {}
+_inflight_lock = threading.Lock()
+
+PERIOD_MAP = {
+    "1d": "1d", "5d": "5d", "1mo": "1mo", "3mo": "3mo",
+    "6mo": "6mo", "1y": "1y", "2y": "2y", "5y": "5y", "max": "max",
+}
+
+INTERVAL_MAP = {
+    "1m": "1m", "2m": "2m", "5m": "5m", "15m": "15m", "30m": "30m",
+    "60m": "1h", "1h": "1h", "1d": "1d", "1wk": "1wk", "1mo": "1mo",
+}
+
 
 def clean_symbol(symbol: str) -> str:
-    """ช่วยแปลง format ชื่อหุ้น เช่น PTT -> PTT.BK สำหรับหุ้นไทย"""
-    s = symbol.strip().upper()
-    # ถ้าพิมพ์เลขหุ้นจีน เช่น 000001 แปลงเป็นตลาดเซินเจิ้น/เซี่ยงไฮ้ หรือใช้ .SS / .SZ ตามความเหมาะสม
-    # แต่โดยทั่วไปผู้ใช้พิมพ์ชื่อหุ้นตรงๆ ได้เลย
-    return s
+    return symbol.strip().upper()
+
+
+def _safe_float(val) -> Optional[float]:
+    if val is None:
+        return None
+    try:
+        f = float(val)
+        return None if f != f else f
+    except (TypeError, ValueError):
+        return None
+
+
+def _get_ticker(symbol: str):
+    cleaned = clean_symbol(symbol)
+    if cleaned not in _ticker_cache:
+        _ticker_cache[cleaned] = yf.Ticker(cleaned)
+    return _ticker_cache[cleaned]
+
+
+def _row_val(df: pd.DataFrame, col, *names) -> Optional[float]:
+    if df is None or df.empty or col not in df.columns:
+        return None
+    for name in names:
+        if name in df.index:
+            v = _safe_float(df.loc[name, col])
+            if v is not None:
+                return v
+    return None
+
+
+def _income_quarters_from_yf(ticker) -> List[dict]:
+    try:
+        df = ticker.quarterly_income_stmt
+        if df is None or df.empty:
+            df = ticker.income_stmt
+        if df is None or df.empty:
+            return []
+
+        quarters = []
+        for col in list(df.columns):
+            gross = _row_val(df, col, "Gross Profit")
+            sales = _row_val(df, col, "Total Revenue", "Operating Revenue")
+            net = _row_val(df, col, "Net Income", "Net Income Common Stockholders")
+            op = _row_val(df, col, "Operating Income", "EBIT")
+            eps = _row_val(df, col, "Diluted EPS", "Basic EPS")
+
+            quarters.append({
+                "fiscal_date": str(col.date()) if hasattr(col, "date") else str(col),
+                "sales": sales,
+                "net_income": net,
+                "gross_profit": gross,
+                "operating_income": op,
+                "eps_diluted": eps,
+                "diluted_shares_outstanding": _row_val(df, col, "Diluted Average Shares", "Basic Average Shares"),
+            })
+        return quarters
+    except Exception as e:
+        print(f"yfinance income error: {e}")
+        return []
+
+
+def _balance_from_yf(ticker) -> Optional[dict]:
+    try:
+        df = ticker.quarterly_balance_sheet
+        if df is None or df.empty:
+            df = ticker.balance_sheet
+        if df is None or df.empty:
+            return None
+
+        col = df.columns[0]
+        equity = _row_val(df, col, "Stockholders Equity", "Total Equity Gross Minority Interest")
+        cur_assets = _row_val(df, col, "Current Assets", "Total Current Assets")
+        cur_liab = _row_val(df, col, "Current Liabilities", "Total Current Liabilities")
+        inventory = _row_val(df, col, "Inventory")
+        total_debt = _row_val(df, col, "Total Debt", "Long Term Debt")
+        short_debt = _row_val(df, col, "Current Debt", "Short Long Term Debt")
+        long_debt = _row_val(df, col, "Long Term Debt")
+
+        if total_debt is None and (short_debt or long_debt):
+            total_debt = (short_debt or 0) + (long_debt or 0)
+
+        return {
+            "shareholders_equity": {"total_shareholders_equity": equity},
+            "assets": {
+                "current_assets": {
+                    "total_current_assets": cur_assets,
+                    "inventory": inventory,
+                }
+            },
+            "liabilities": {
+                "current_liabilities": {
+                    "total_current_liabilities": cur_liab,
+                    "short_term_debt": short_debt,
+                },
+                "non_current_liabilities": {
+                    "long_term_debt": long_debt or (total_debt - (short_debt or 0) if total_debt else None),
+                },
+            },
+        }
+    except Exception as e:
+        print(f"yfinance balance error: {e}")
+        return None
+
+
+def _earnings_from_yf(ticker, info: dict) -> List[dict]:
+    earnings = []
+    forward_eps = _safe_float(info.get("forwardEps"))
+    if forward_eps:
+        earnings.append({"eps_estimate": forward_eps})
+
+    try:
+        cal = ticker.calendar
+        if isinstance(cal, dict) and cal.get("Earnings Estimate"):
+            est = _safe_float(cal["Earnings Estimate"])
+            if est and not earnings:
+                earnings.append({"eps_estimate": est})
+    except Exception:
+        pass
+
+    return earnings
+
+
+def _dividends_from_yf(ticker) -> List[dict]:
+    try:
+        divs = ticker.dividends
+        if divs is None or divs.empty:
+            return []
+        items = []
+        for date, amount in divs.tail(8).items():
+            items.append({
+                "ex_date": str(date.date()) if hasattr(date, "date") else str(date),
+                "amount": float(amount),
+            })
+        return list(reversed(items))
+    except Exception:
+        return []
+
+
+def _fetch_raw_data(cleaned: str) -> RawFinancials:
+    ticker = _get_ticker(cleaned)
+    info = ticker.info or {}
+    income_quarters = _income_quarters_from_yf(ticker)
+
+    shares = _safe_float(info.get("sharesOutstanding"))
+    if income_quarters and shares and not income_quarters[0].get("diluted_shares_outstanding"):
+        income_quarters[0]["diluted_shares_outstanding"] = shares
+
+    return RawFinancials(
+        symbol=cleaned,
+        name=info.get("shortName") or info.get("longName"),
+        currency=info.get("currency"),
+        exchange=info.get("exchange") or info.get("fullExchangeName"),
+        sector=info.get("sector"),
+        industry=info.get("industry"),
+        summary=info.get("longBusinessSummary"),
+        income_quarters=income_quarters,
+        balance_latest=_balance_from_yf(ticker),
+        earnings=_earnings_from_yf(ticker, info),
+        dividends=_dividends_from_yf(ticker),
+    )
+
+
+def get_raw_financials(symbol: str) -> RawFinancials:
+    cleaned = clean_symbol(symbol)
+    now = time.time()
+
+    if cleaned in raw_cache and now - raw_cache[cleaned]["timestamp"] < RAW_CACHE_EXPIRY:
+        return raw_cache[cleaned]["data"]
+
+    with _inflight_lock:
+        if cleaned in _inflight_raw:
+            evt = _inflight_raw[cleaned]
+            is_owner = False
+        else:
+            evt = threading.Event()
+            _inflight_raw[cleaned] = evt
+            is_owner = True
+
+    if not is_owner:
+        evt.wait(timeout=30)
+        if cleaned in raw_cache:
+            return raw_cache[cleaned]["data"]
+        return RawFinancials(symbol=cleaned)
+
+    try:
+        raw = _fetch_raw_data(cleaned)
+        raw_cache[cleaned] = {"timestamp": time.time(), "data": raw}
+        return raw
+    finally:
+        with _inflight_lock:
+            _inflight_raw.pop(cleaned, None)
+            evt.set()
+
+
+def _quote_market_time(info: dict, hist: pd.DataFrame) -> tuple[str, Optional[str], Optional[str]]:
+    tz_name = info.get("exchangeTimezoneName")
+    market_state = info.get("marketState")
+
+    ts = info.get("regularMarketTime")
+    if ts:
+        dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+        if tz_name:
+            try:
+                dt = dt.astimezone(ZoneInfo(tz_name))
+            except Exception:
+                pass
+        return dt.isoformat(), market_state, tz_name
+
+    if hist is not None and not hist.empty:
+        last = hist.index[-1]
+        if hasattr(last, "to_pydatetime"):
+            dt = last.to_pydatetime()
+            if dt.tzinfo is None and tz_name:
+                try:
+                    dt = dt.replace(tzinfo=ZoneInfo(tz_name))
+                except Exception:
+                    pass
+            return dt.isoformat(), market_state, tz_name
+        return str(last), market_state, tz_name
+
+    return datetime.now(timezone.utc).isoformat(), market_state, tz_name
+
 
 def get_stock_quote(symbol: str) -> Optional[StockQuote]:
     cleaned = clean_symbol(symbol)
     now = time.time()
-    
-    # ตรวจสอบ Cache
-    if cleaned in quote_cache:
-        cached_data = quote_cache[cleaned]
-        if now - cached_data["timestamp"] < CACHE_EXPIRY:
-            return cached_data["data"]
-            
-    def _fetch_quote():
-        # Twelve Data API - Price endpoint
-        params = {
-            'apikey': TWELVE_DATA_API_KEY,
-            'symbol': cleaned,
-            'outputsize': '1'
-        }
-        
-        response = session.get(f'{TWELVE_DATA_BASE_URL}/price', params=params)
-        response.raise_for_status()
-        data = response.json()
-        
-        if 'price' not in data:
-            raise ValueError(f"No price data for {cleaned}")
-        
-        # ดึงข้อมูลเพิ่มเติมจาก time_series เพื่อหา previous close
-        params['interval'] = '1day'
-        params['outputsize'] = '2'
-        ts_response = session.get(f'{TWELVE_DATA_BASE_URL}/time_series', params=params)
-        ts_response.raise_for_status()
-        ts_data = ts_response.json()
-        
-        if 'values' in ts_data and len(ts_data['values']) >= 2:
-            previous_close = float(ts_data['values'][1]['close'])
-        else:
-            previous_close = data['price']
-        
-        price = float(data['price'])
-        change = price - previous_close
-        change_percent = (change / previous_close) * 100 if previous_close != 0 else 0
-        
+
+    if cleaned in quote_cache and now - quote_cache[cleaned]["timestamp"] < QUOTE_CACHE_EXPIRY:
+        cached = quote_cache[cleaned]["data"]
+        if isinstance(cached, StockQuote):
+            return cached
+        return cached
+
+    try:
+        ticker = _get_ticker(cleaned)
+        info = ticker.info or {}
+        hist = ticker.history(period="5d")
+
+        if hist.empty:
+            return None
+
+        price = round(float(hist["Close"].iloc[-1]), 2)
+        prev = float(hist["Close"].iloc[-2]) if len(hist) > 1 else price
+        change = round(price - prev, 2)
+        change_pct = round(change / prev * 100, 2) if prev else 0
+
+        market_time, market_state, exchange_timezone = _quote_market_time(info, hist)
+        fetched_at = datetime.now(timezone.utc).isoformat()
+
         quote = StockQuote(
             symbol=cleaned,
-            name=cleaned,  # Twelve Data ไม่มีชื่อบริษัทใน price endpoint
-            price=round(price, 2),
-            change=round(change, 2),
-            change_percent=round(change_percent, 2),
-            currency='USD',  # Twelve Data ส่วนใหญ่เป็น USD
-            exchange='Unknown',
-            market_time=str(datetime.now())
+            name=info.get("shortName") or info.get("longName") or cleaned,
+            price=price,
+            change=change,
+            change_percent=change_pct,
+            currency=info.get("currency", "USD"),
+            exchange=info.get("exchange") or info.get("fullExchangeName") or "Unknown",
+            market_time=market_time,
+            market_state=market_state,
+            exchange_timezone=exchange_timezone,
+            fetched_at=fetched_at,
         )
-        
-        # บันทึกลง Cache
-        quote_cache[cleaned] = {
-            "timestamp": now,
-            "data": quote
-        }
+        quote_cache[cleaned] = {"timestamp": now, "data": quote}
         return quote
-    
-    try:
-        return retry_with_backoff(_fetch_quote)
     except Exception as e:
-        print(f"Error fetching quote for {cleaned}: {e}")
+        print(f"yfinance quote error for {cleaned}: {e}")
         return None
 
-def get_stock_info(symbol: str) -> Optional[StockInfo]:
+
+def get_stock_info(symbol: str, price: Optional[float] = None, history_df=None) -> Optional[StockInfo]:
     cleaned = clean_symbol(symbol)
-    now = time.time()
-    
-    if cleaned in info_cache:
-        cached_data = info_cache[cleaned]
-        if now - cached_data["timestamp"] < CACHE_EXPIRY * 6:
-            return cached_data["data"]
-            
-    def _fetch_info():
-        # Twelve Data API - Fundamental data
-        params = {
-            'apikey': TWELVE_DATA_API_KEY,
-            'symbol': cleaned
-        }
-        
-        # ดึงข้อมูล fundamental
-        response = session.get(f'{TWELVE_DATA_BASE_URL}/symbol_profile', params=params)
-        response.raise_for_status()
-        data = response.json()
-        
-        # ดึงข้อมูล financial ratios
-        params['type'] = 'financial-ratios'
-        ratios_response = session.get(f'{TWELVE_DATA_BASE_URL}/financial_ratios', params=params)
-        ratios_response.raise_for_status()
-        ratios_data = ratios_response.json()
-        
-        stock_info = StockInfo(
-            symbol=cleaned,
-            name=data.get('name', data.get('description', cleaned)),
-            summary=data.get('description'),
-            industry=data.get('industry'),
-            sector=data.get('sector'),
-            pe_ratio=ratios_data.get('pe_ratio'),
-            market_cap=data.get('market_cap'),
-            dividend_yield=ratios_data.get('dividend_yield'),
-            fifty_two_week_high=data.get('fifty_two_week_high'),
-            fifty_two_week_low=data.get('fifty_two_week_low')
-        )
-        
-        info_cache[cleaned] = {
-            "timestamp": now,
-            "data": stock_info
-        }
-        return stock_info
-    
-    try:
-        return retry_with_backoff(_fetch_info)
-    except Exception as e:
-        print(f"Error fetching info for {cleaned}: {e}")
+    raw = get_raw_financials(cleaned)
+
+    if price is None:
+        quote = get_stock_quote(cleaned)
+        price = quote.price if quote else None
+    if price is None:
         return None
 
-def get_stock_history(symbol: str, period: str = "1mo", interval: str = "15m") -> List[StockHistoryItem]:
+    metrics = compute_fundamentals(price, raw, history_df)
+    ticker = _get_ticker(cleaned)
+    info = ticker.info or {}
+
+    return StockInfo(
+        symbol=cleaned,
+        name=raw.name,
+        summary=raw.summary,
+        industry=raw.industry,
+        sector=raw.sector,
+        pe_ratio=metrics.get("pe_ratio"),
+        forward_pe=metrics.get("forward_pe"),
+        peg_ratio=metrics.get("peg_ratio"),
+        ps_ratio=metrics.get("ps_ratio"),
+        pb_ratio=metrics.get("pb_ratio"),
+        roe=metrics.get("roe"),
+        debt_to_equity=metrics.get("debt_to_equity"),
+        current_ratio=metrics.get("current_ratio"),
+        profit_margin=metrics.get("net_margin"),
+        revenue_growth=metrics.get("revenue_growth"),
+        earnings_growth=metrics.get("earnings_growth"),
+        market_cap=metrics.get("market_cap") or _safe_float(info.get("marketCap")),
+        dividend_yield=metrics.get("dividend_yield") or _safe_float(info.get("dividendYield")),
+        beta=_safe_float(info.get("beta")),
+        fifty_two_week_high=metrics.get("fifty_two_week_high") or _safe_float(info.get("fiftyTwoWeekHigh")),
+        fifty_two_week_low=metrics.get("fifty_two_week_low") or _safe_float(info.get("fiftyTwoWeekLow")),
+        currency=raw.currency,
+        exchange=raw.exchange,
+    )
+
+
+def get_fundamental_metrics(symbol: str, price: float, history_df=None) -> dict:
+    raw = get_raw_financials(symbol)
+    return compute_fundamentals(price, raw, history_df)
+
+
+def _format_history_time(idx, interval: str) -> str:
+    """Daily bars use YYYY-MM-DD (exchange date). Intraday uses ISO with timezone."""
+    if interval in ("1d", "1wk", "1mo"):
+        if hasattr(idx, "strftime"):
+            return idx.strftime("%Y-%m-%d")
+        return str(idx)[:10]
+
+    if hasattr(idx, "isoformat"):
+        return idx.isoformat()
+    if hasattr(idx, "strftime"):
+        return idx.strftime("%Y-%m-%d %H:%M:%S")
+    return str(idx)
+
+
+def get_stock_history(symbol: str, period: str = "1mo", interval: str = "1d") -> List[StockHistoryItem]:
     cleaned = clean_symbol(symbol)
-    cache_key = f"{cleaned}_{period}_{interval}"
+    yf_period = PERIOD_MAP.get(period, "6mo")
+    yf_interval = INTERVAL_MAP.get(interval, "1d")
+    cache_key = f"{cleaned}_{yf_period}_{yf_interval}"
     now = time.time()
-    
-    if cache_key in history_cache:
-        cached_data = history_cache[cache_key]
-        if now - cached_data["timestamp"] < CACHE_EXPIRY:
-            return cached_data["data"]
-            
-    def _fetch_history():
-        # Twelve Data API - Time Series
-        params = {
-            'apikey': TWELVE_DATA_API_KEY,
-            'symbol': cleaned,
-            'interval': interval,
-            'outputsize': '5000'  # ดึงข้อมูลให้มากที่สุด
-        }
-        
-        response = session.get(f'{TWELVE_DATA_BASE_URL}/time_series', params=params)
-        response.raise_for_status()
-        data = response.json()
-        
-        if 'values' not in data:
-           raise ValueError(f"No history data for {cleaned}")
-        
+
+    if cache_key in history_cache and now - history_cache[cache_key]["timestamp"] < HISTORY_CACHE_EXPIRY:
+        return history_cache[cache_key]["data"]
+
+    try:
+        ticker = _get_ticker(cleaned)
+        df = ticker.history(period=yf_period, interval=yf_interval)
+        if df.empty:
+            return []
+
         history = []
-        for item in data['values']:
-            # Twelve Data ส่ง datetime เป็น string
-            time_str = item['datetime']
+        for idx, row in df.iterrows():
             history.append(StockHistoryItem(
-                time=time_str,
-                open=round(float(item['open']), 2),
-                high=round(float(item['high']), 2),
-                low=round(float(item['low']), 2),
-                close=round(float(item['close']), 2),
-                volume=int(item['volume']) if item['volume'] else 0
+                time=_format_history_time(idx, yf_interval),
+                open=round(float(row["Open"]), 2),
+                high=round(float(row["High"]), 2),
+                low=round(float(row["Low"]), 2),
+                close=round(float(row["Close"]), 2),
+                volume=int(row["Volume"]) if pd.notna(row["Volume"]) else 0,
             ))
-        
-        # เรียงลำดับจากเก่าไปใหม่
-        history.reverse()
-        
-        history_cache[cache_key] = {
-            "timestamp": now,
-            "data": history
-        }
+
+        history_cache[cache_key] = {"timestamp": now, "data": history}
         return history
-    
-    try:
-        return retry_with_backoff(_fetch_history)
     except Exception as e:
-        print(f"Error fetching history for {cleaned}: {e}")
+        print(f"yfinance history error for {cleaned}: {e}")
+        return []
+
+
+def search_symbols(query: str, limit: int = 10) -> List[dict]:
+    try:
+        results = yf.Search(query, max_results=limit)
+        items = []
+        for q in (results.quotes or [])[:limit]:
+            sym = q.get("symbol", "")
+            if sym:
+                items.append({
+                    "symbol": sym,
+                    "name": q.get("shortname") or q.get("longname"),
+                    "exchange": q.get("exchange"),
+                    "type": q.get("quoteType"),
+                })
+        return items
+    except Exception as e:
+        print(f"yfinance search error: {e}")
         return []

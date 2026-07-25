@@ -4,52 +4,32 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from .schemas import FundamentalAnalysis, TechnicalAnalysis, TrendAnalysis
 
-def calculate_fundamental_analysis(df: pd.DataFrame, symbol: str, info: Dict = None) -> FundamentalAnalysis:
-    """คำนวณ Fundamental indicators จากข้อมูลหุ้น"""
+def calculate_fundamental_analysis(df: pd.DataFrame, symbol: str, metrics: Dict = None) -> FundamentalAnalysis:
+    """คำนวณ Fundamental indicators — metrics มาจาก backend คำนวณเองจากข้อมูลดิบ"""
     analysis_date = datetime.now().isoformat()
-    
-    # ถ้ามี info จาก yfinance ให้ใช้ค่าจาก info
-    if info:
-        pe_ratio = info.get("trailingPE")
-        peg_ratio = info.get("pegRatio")
-        pb_ratio = info.get("priceToBook")
-        roe = info.get("returnOnEquity")
-        debt_to_equity = info.get("debtToEquity")
-        current_ratio = info.get("currentRatio")
-        quick_ratio = info.get("quickRatio")
-        gross_margin = info.get("grossMargins")
-        operating_margin = info.get("operatingMargins")
-        net_margin = info.get("profitMargins")
-        revenue_growth = info.get("revenueGrowth")
-        earnings_growth = info.get("earningsGrowth")
-    else:
-        # คำนวณจากข้อมูลใน DataFrame ถ้ามี
-        pe_ratio = None
-        peg_ratio = None
-        pb_ratio = None
-        roe = None
-        debt_to_equity = None
-        current_ratio = None
-        quick_ratio = None
-        gross_margin = None
-        operating_margin = None
-        net_margin = None
-        revenue_growth = None
-        earnings_growth = None
-    
-    # คำนวณ P/S จากข้อมูล
-    if not pd.isna(df['Close'].iloc[-1]) and info:
-        market_cap = info.get("marketCap")
-        if market_cap and info.get("totalRevenue"):
-            ps_ratio = market_cap / info.get("totalRevenue")
-        else:
-            ps_ratio = None
-    else:
-        ps_ratio = None
-    
+    m = metrics or {}
+
+    pe_ratio = m.get("pe_ratio")
+    forward_pe = m.get("forward_pe")
+    peg_ratio = m.get("peg_ratio")
+    ps_ratio = m.get("ps_ratio")
+    pb_ratio = m.get("pb_ratio")
+    roe = m.get("roe")
+    debt_to_equity = m.get("debt_to_equity")
+    current_ratio = m.get("current_ratio")
+    quick_ratio = m.get("quick_ratio")
+    gross_margin = m.get("gross_margin")
+    operating_margin = m.get("operating_margin")
+    net_margin = m.get("net_margin")
+    revenue_growth = m.get("revenue_growth")
+    earnings_growth = m.get("earnings_growth")
+
+    valuation_grade = _grade_valuation(pe_ratio, peg_ratio, ps_ratio, pb_ratio)
+
     return FundamentalAnalysis(
         symbol=symbol,
         pe_ratio=pe_ratio,
+        forward_pe=forward_pe,
         peg_ratio=peg_ratio,
         ps_ratio=ps_ratio,
         pb_ratio=pb_ratio,
@@ -62,8 +42,32 @@ def calculate_fundamental_analysis(df: pd.DataFrame, symbol: str, info: Dict = N
         net_margin=net_margin,
         revenue_growth=revenue_growth,
         earnings_growth=earnings_growth,
+        valuation_grade=valuation_grade,
         analysis_date=analysis_date
     )
+
+
+def _grade_valuation(pe, peg, ps, pb) -> str:
+    score = 0
+    if pe is not None:
+        if pe < 15: score += 2
+        elif pe < 25: score += 1
+        elif pe > 40: score -= 2
+        elif pe > 30: score -= 1
+    if peg is not None:
+        if peg < 1: score += 2
+        elif peg < 1.5: score += 1
+        elif peg > 2: score -= 1
+    if ps is not None:
+        if ps < 2: score += 1
+        elif ps > 10: score -= 1
+    if pb is not None:
+        if pb < 1.5: score += 1
+        elif pb > 5: score -= 1
+    if score >= 3: return "undervalued"
+    if score >= 1: return "fair"
+    if score <= -2: return "overvalued"
+    return "neutral"
 
 def calculate_technical_analysis(df: pd.DataFrame, symbol: str) -> TechnicalAnalysis:
     """คำนวณ Technical indicators โดยใช้ pandas-ta"""
@@ -189,7 +193,7 @@ def calculate_rsi(prices: pd.Series, period: int = 14) -> pd.Series:
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
-def calculate_macd(prices: pd.Series) -> Tuple[List, List, List]]:
+def calculate_macd(prices: pd.Series) -> Tuple[List, List, List]:
     """คำนวณ MACD"""
     exp12 = prices.ewm(span=12, adjust=False).mean()
     exp26 = prices.ewm(span=26, adjust=False).mean()
@@ -198,7 +202,7 @@ def calculate_macd(prices: pd.Series) -> Tuple[List, List, List]]:
     histogram = macd - signal
     return macd.tolist(), signal.tolist(), histogram.tolist()
 
-def calculate_bollinger_bands(prices: pd.Series, period: int = 20, std_dev: int = 2) -> Tuple[List, List, List]]:
+def calculate_bollinger_bands(prices: pd.Series, period: int = 20, std_dev: int = 2) -> Tuple[List, List, List]:
     """คำนวณ Bollinger Bands"""
     sma = prices.rolling(window=period).mean()
     std = prices.rolling(window=period).std()

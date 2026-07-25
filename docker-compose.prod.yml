@@ -1,0 +1,13 @@
+# Production override — ใช้คู่กับ docker-compose.yml
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+services:
+  backend:
+    ports:
+      - "127.0.0.1:8010:8010"
+    environment:
+      APP_ENV: production
+
+  frontend:
+    ports:
+      - "127.0.0.1:3010:80"

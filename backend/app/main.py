@@ -1,339 +1,297 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional
-from .schemas import StockQuote, StockHistoryResponse, StockInfo, CSVImportRequest, CSVExportRequest, AnalysisResponse
-from .services import get_stock_quote, get_stock_history, get_stock_info
-from .analysis import parse_csv_data, export_to_csv, calculate_fundamental_analysis, calculate_technical_analysis, calculate_trend_analysis
+from typing import List
+import os
+import pandas as pd
 import asyncio
+
+from .init_db import init_db
+from .auth import get_current_user
+from .database import get_db
+from .models import User
+from .routers import auth, users, favorites, positions, watchlist
+from sqlalchemy.orm import Session
+from .schemas import (
+    StockQuote, StockHistoryResponse, StockInfo, CSVImportRequest, CSVExportRequest,
+    AnalysisResponse, ComparisonResponse, BatchAnalysisRequest, SearchResult,
+    QuarterlyFundamentalsResponse, QuarterlyFundamentalItem,
+    ValuationHistoryResponse, ValuationHistoryItem,
+    MarketSignalsResponse,
+)
+from .market_signals import get_market_signals
+from .services import (
+    get_stock_quote, get_stock_history, get_stock_info, get_fundamental_metrics, search_symbols,
+)
+from .valuation_charts import build_quarterly_series, build_pe_history
+from .analysis import (
+    parse_csv_data, export_to_csv, calculate_fundamental_analysis,
+    calculate_technical_analysis, calculate_trend_analysis,
+)
+from .risk import generate_recommendation, generate_trading_plan
 
 app = FastAPI(
     title="Stock Analyzer API",
-    description="API สำหรับดึงข้อมูลหุ้นดีเลย์ 5-15 นาที รองรับหุ้นไทย (SET), สหรัฐฯ (US), จีน (CN)",
-    version="1.0.0"
+    description="วิเคราะห์หุ้นทั่วโลก — P/E, PEG, P/S, Technical, Position Sizing, Stop Loss",
+    version="2.1.0",
 )
 
-# เปิด CORS เพื่อให้ Frontend (React) เชื่อมต่อได้
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ในโปรดักชันควรจำกัด origin
+    allow_origins=[o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/")
-def read_root():
-    return {"status": "online", "message": "Stock Analyzer API is running"}
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(favorites.router)
+app.include_router(positions.router)
+app.include_router(watchlist.router)
 
-@app.get("/api/stock/quote", response_model=StockQuote)
-def get_quote(symbol: str = Query(..., description="ชื่อย่อหุ้น เช่น AAPL, PTT.BK, 0700.HK")):
-    quote = get_stock_quote(symbol)
-    if not quote:
-        raise HTTPException(status_code=404, detail=f"Stock symbol '{symbol}' not found or error fetching data")
-    return quote
+protected = APIRouter(dependencies=[Depends(get_current_user)])
 
-@app.get("/api/stock/info", response_model=StockInfo)
-def get_info(symbol: str = Query(..., description="ชื่อย่อหุ้น เช่น AAPL, PTT.BK, 0700.HK")):
-    info = get_stock_info(symbol)
-    if not info:
-        raise HTTPException(status_code=404, detail=f"Stock info for '{symbol}' not found")
-    return info
 
-@app.get("/api/stock/history", response_model=StockHistoryResponse)
-def get_history(
-    symbol: str = Query(..., description="ชื่อย่อหุ้น"),
-    period: str = Query("1mo", description="ช่วงเวลา: 1d, 5d, 1mo, 3mo, 6mo, 1y, 5y, max"),
-    interval: str = Query("15m", description="ระยะห่างของแท่งกราฟ: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo")
-):
-    # ป้องกันการดึง interval สั้นเกินไปกับ period ยาวมากๆ ซึ่ง Yahoo จะไม่อนุญาต
+@app.on_event("startup")
+def on_startup():
+    init_db()
+
+
+def _history_to_df(history) -> pd.DataFrame:
+    data = [{"Date": i.time, "Open": i.open, "High": i.high, "Low": i.low, "Close": i.close, "Volume": i.volume} for i in history]
+    df = pd.DataFrame(data)
+    df["Date"] = pd.to_datetime(df["Date"])
+    df.set_index("Date", inplace=True)
+    return df
+
+
+def _run_analysis(
+    symbol: str,
+    period: str = "6mo",
+    interval: str = "1d",
+    account_size: float = 100_000,
+    risk_pct: float = 2.0,
+) -> AnalysisResponse:
     history = get_stock_history(symbol, period, interval)
     if not history:
-        raise HTTPException(status_code=404, detail=f"History for '{symbol}' not found with period={period} and interval={interval}")
-    
-    return StockHistoryResponse(
-        symbol=symbol,
-        interval=interval,
-        history=history
+        raise HTTPException(status_code=404, detail=f"ไม่พบข้อมูลราคา '{symbol}'")
+
+    df = _history_to_df(history)
+    quote = get_stock_quote(symbol)
+    current_price = quote.price if quote else float(df["Close"].iloc[-1])
+    currency = quote.currency if quote else "USD"
+
+    try:
+        metrics = get_fundamental_metrics(symbol, current_price, df)
+    except Exception as e:
+        print(f"Fundamentals skip for {symbol}: {e}")
+        metrics = {}
+
+    fundamental = calculate_fundamental_analysis(df, symbol, metrics)
+    technical = calculate_technical_analysis(df, symbol)
+    trend = calculate_trend_analysis(df, symbol)
+    recommendation = generate_recommendation(fundamental, technical, trend, current_price)
+
+    trading_plan = generate_trading_plan(
+        df, fundamental, technical, trend, recommendation,
+        current_price, account_size, risk_pct, currency,
     )
 
-# CSV Import/Export Endpoints
-@app.post("/api/csv/import")
+    return AnalysisResponse(
+        symbol=symbol.upper(),
+        current_price=current_price,
+        currency=currency,
+        fundamental=fundamental,
+        technical=technical,
+        trend=trend,
+        recommendation=recommendation["action"],
+        confidence=recommendation["confidence"],
+        trading_plan=trading_plan,
+    )
+
+
+@app.get("/")
+def read_root():
+    return {"status": "online", "message": "Stock Analyzer API v2.1", "data_source": "Yahoo Finance (yfinance)"}
+
+
+@protected.get("/api/stock/quote", response_model=StockQuote)
+def get_quote(symbol: str = Query(...)):
+    quote = get_stock_quote(symbol)
+    if not quote:
+        raise HTTPException(status_code=404, detail=f"ไม่พบหุ้น '{symbol}'")
+    return quote
+
+
+@protected.get("/api/stock/info", response_model=StockInfo)
+def get_info(symbol: str = Query(...)):
+    info = get_stock_info(symbol)
+    if not info:
+        raise HTTPException(status_code=404, detail=f"ไม่พบข้อมูล '{symbol}'")
+    return info
+
+
+@protected.get("/api/stock/history", response_model=StockHistoryResponse)
+def get_history(
+    symbol: str = Query(...),
+    period: str = Query("6mo"),
+    interval: str = Query("1d"),
+):
+    history = get_stock_history(symbol, period, interval)
+    if not history:
+        raise HTTPException(status_code=404, detail=f"ไม่พบประวัติราคา '{symbol}'")
+    return StockHistoryResponse(symbol=symbol.upper(), interval=interval, history=history)
+
+
+@protected.get("/api/stock/search", response_model=List[SearchResult])
+def search_stocks(q: str = Query(..., min_length=1), limit: int = Query(10, le=20)):
+    results = search_symbols(q, limit)
+    return [SearchResult(**r) for r in results if r.get("symbol")]
+
+
+@protected.get("/api/stock/fundamentals/quarterly", response_model=QuarterlyFundamentalsResponse)
+def get_quarterly_fundamentals(symbol: str = Query(...)):
+    quarters = build_quarterly_series(symbol)
+    if not quarters:
+        raise HTTPException(status_code=404, detail=f"ไม่พบงบรายไตรมาส '{symbol}'")
+    return QuarterlyFundamentalsResponse(
+        symbol=symbol.upper(),
+        quarters=[QuarterlyFundamentalItem(**q) for q in quarters],
+    )
+
+
+@protected.get("/api/stock/fundamentals/pe-history", response_model=ValuationHistoryResponse)
+def get_pe_history(
+    symbol: str = Query(...),
+    period: str = Query("2y"),
+):
+    history = build_pe_history(symbol, period)
+    if not history:
+        raise HTTPException(status_code=404, detail=f"ไม่พบประวัติ P/E '{symbol}'")
+    return ValuationHistoryResponse(
+        symbol=symbol.upper(),
+        period=period,
+        history=[ValuationHistoryItem(**h) for h in history],
+    )
+
+
+@protected.get("/api/analysis/market-signals", response_model=MarketSignalsResponse)
+def market_signals(
+    refresh: bool = Query(False),
+    scope: str = Query("global", description="global | personal (ใช้รายการโปรด)"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if scope not in ("global", "personal"):
+        raise HTTPException(status_code=400, detail="scope ต้องเป็น global หรือ personal")
+    return get_market_signals(db, user.id, scope, force_refresh=refresh)
+
+
+@protected.get("/api/analysis/full", response_model=AnalysisResponse)
+def get_full_analysis(
+    symbol: str = Query(...),
+    period: str = Query("6mo"),
+    interval: str = Query("1d"),
+    account_size: float = Query(100_000, description="เงินทุนพอร์ต"),
+    risk_pct: float = Query(2.0, description="ความเสี่ยงต่อเทรด (%)"),
+):
+    try:
+        return _run_analysis(symbol, period, interval, account_size, risk_pct)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@protected.get("/api/analysis/compare", response_model=ComparisonResponse)
+def compare_stocks(
+    symbols: str = Query(..., description="สัญลักษณ์คั่นด้วยจุลภาค เช่น AAPL,MSFT,GOOGL"),
+    period: str = Query("6mo"),
+    interval: str = Query("1d"),
+    account_size: float = Query(100_000),
+    risk_pct: float = Query(2.0),
+):
+    symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    if len(symbol_list) < 2:
+        raise HTTPException(status_code=400, detail="ต้องระบุอย่างน้อย 2 หุ้น")
+    if len(symbol_list) > 5:
+        raise HTTPException(status_code=400, detail="เปรียบเทียบได้สูงสุด 5 หุ้น")
+
+    results = []
+    for sym in symbol_list:
+        try:
+            results.append(_run_analysis(sym, period, interval, account_size, risk_pct))
+        except HTTPException:
+            results.append(AnalysisResponse(symbol=sym, recommendation="error", confidence=0))
+
+    valid = [r for r in results if r.recommendation != "error" and r.trading_plan]
+    best = None
+    if valid:
+        buys = [r for r in valid if r.recommendation == "buy"]
+        pool = buys if buys else valid
+        best = max(pool, key=lambda r: (r.confidence or 0, r.trading_plan.score if r.trading_plan else 0)).symbol
+
+    summary_parts = []
+    for r in valid:
+        summary_parts.append(
+            f"{r.symbol}: {r.recommendation.upper()} ({(r.confidence or 0)*100:.0f}%) "
+            f"P/E={r.fundamental.pe_ratio or 'N/A'}"
+        )
+
+    return ComparisonResponse(
+        symbols=symbol_list,
+        results=results,
+        best_pick=best,
+        summary=" | ".join(summary_parts) if summary_parts else "ไม่พบข้อมูลเพียงพอ",
+    )
+
+
+@protected.post("/api/analysis/batch")
+async def batch_analysis(body: BatchAnalysisRequest):
+    results = []
+    for symbol in body.symbols:
+        try:
+            results.append(_run_analysis(symbol, body.period, body.interval, body.account_size, body.risk_pct))
+        except HTTPException as e:
+            results.append({"symbol": symbol, "error": e.detail})
+        except Exception as e:
+            results.append({"symbol": symbol, "error": str(e)})
+        await asyncio.sleep(0.5)
+    return {"results": results}
+
+
+@protected.post("/api/csv/import")
 def import_csv(request: CSVImportRequest):
-    """Import CSV data และวิเคราะห์"""
     try:
         df = parse_csv_data(request.csv_data)
-        
-        # คำนวณ analysis
         fundamental = calculate_fundamental_analysis(df, request.symbol)
         technical = calculate_technical_analysis(df, request.symbol)
         trend = calculate_trend_analysis(df, request.symbol)
-        
-        # สร้าง recommendation
-        recommendation = generate_recommendation(fundamental, technical, trend)
-        
+        current_price = float(df["Close"].iloc[-1])
+        recommendation = generate_recommendation(fundamental, technical, trend, current_price)
+        trading_plan = generate_trading_plan(df, fundamental, technical, trend, recommendation, current_price)
         return AnalysisResponse(
-            symbol=request.symbol,
-            fundamental=fundamental,
-            technical=technical,
-            trend=trend,
-            recommendation=recommendation["action"],
-            confidence=recommendation["confidence"]
+            symbol=request.symbol, current_price=current_price,
+            fundamental=fundamental, technical=technical, trend=trend,
+            recommendation=recommendation["action"], confidence=recommendation["confidence"],
+            trading_plan=trading_plan,
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error parsing CSV: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/api/csv/export")
+
+@protected.post("/api/csv/export")
 def export_csv(request: CSVExportRequest):
-    """Export ข้อมูลหุ้นเป็น CSV"""
-    try:
-        history = get_stock_history(request.symbol, request.period, request.interval)
-        if not history:
-            raise HTTPException(status_code=404, detail=f"History for '{request.symbol}' not found")
-        
-        # แปลงเป็น DataFrame
-        import pandas as pd
-        data = []
-        for item in history:
-            data.append({
-                'Date': item.time,
-                'Open': item.open,
-                'High': item.high,
-                'Low': item.low,
-                'Close': item.close,
-                'Volume': item.volume
-            })
-        
-        df = pd.DataFrame(data)
-        df['Date'] = pd.to_datetime(df['Date'])
-        df.set_index('Date', inplace=True)
-        
-        csv_data = export_to_csv(df)
-        
-        return {
-            "symbol": request.symbol,
-            "csv_data": csv_data,
-            "period": request.period,
-            "interval": request.interval
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error exporting CSV: {str(e)}")
+    history = get_stock_history(request.symbol, request.period, request.interval)
+    if not history:
+        raise HTTPException(status_code=404, detail=f"ไม่พบข้อมูล '{request.symbol}'")
+    df = _history_to_df(history)
+    return {
+        "symbol": request.symbol,
+        "csv_data": export_to_csv(df),
+        "period": request.period,
+        "interval": request.interval,
+    }
 
-# Analysis Endpoints
-@app.get("/api/analysis/full", response_model=AnalysisResponse)
-def get_full_analysis(
-    symbol: str = Query(..., description="ชื่อย่อหุ้น"),
-    period: str = Query("1mo", description="ช่วงเวลา"),
-    interval: str = Query("1d", description="ระยะห่างของแท่งกราฟ")
-):
-    """วิเคราะห์หุ้นแบบเต็มรูปแบบ (Fundamental + Technical + Trend)"""
-    try:
-        # ดึงข้อมูล history
-        history = get_stock_history(symbol, period, interval)
-        if not history:
-            raise HTTPException(status_code=404, detail=f"History for '{symbol}' not found")
-        
-        # แปลงเป็น DataFrame
-        import pandas as pd
-        data = []
-        for item in history:
-            data.append({
-                'Date': item.time,
-                'Open': item.open,
-                'High': item.high,
-                'Low': item.low,
-                'Close': item.close,
-                'Volume': item.volume
-            })
-        
-        df = pd.DataFrame(data)
-        df['Date'] = pd.to_datetime(df['Date'])
-        df.set_index('Date', inplace=True)
-        
-        # ดึงข้อมูล info สำหรับ fundamental
-        info = get_stock_info(symbol)
-        info_dict = None
-        if info:
-            info_dict = {
-                "trailingPE": info.pe_ratio,
-                "pegRatio": None,  # ต้องดึงจาก yfinance โดยตรง
-                "priceToBook": None,
-                "returnOnEquity": None,
-                "debtToEquity": None,
-                "currentRatio": None,
-                "quickRatio": None,
-                "grossMargins": None,
-                "operatingMargins": None,
-                "profitMargins": None,
-                "revenueGrowth": None,
-                "earningsGrowth": None,
-                "marketCap": info.market_cap,
-                "totalRevenue": None
-            }
-        
-        # คำนวณ analysis
-        fundamental = calculate_fundamental_analysis(df, symbol, info_dict)
-        technical = calculate_technical_analysis(df, symbol)
-        trend = calculate_trend_analysis(df, symbol)
-        
-        # สร้าง recommendation
-        recommendation = generate_recommendation(fundamental, technical, trend)
-        
-        return AnalysisResponse(
-            symbol=symbol,
-            fundamental=fundamental,
-            technical=technical,
-            trend=trend,
-            recommendation=recommendation["action"],
-            confidence=recommendation["confidence"]
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error performing analysis: {str(e)}")
 
-def generate_recommendation(fundamental, technical, trend) -> dict:
-    """สร้าง recommendation จากข้อมูลวิเคราะห์"""
-    score = 0
-    factors = 0
-    
-    # Technical Analysis Score
-    if technical.rsi_signal == "buy":
-        score += 1
-        factors += 1
-    elif technical.rsi_signal == "sell":
-        score -= 1
-        factors += 1
-    
-    if trend.trend_direction == "uptrend":
-        score += 2
-        factors += 1
-    elif trend.trend_direction == "downtrend":
-        score -= 2
-        factors += 1
-    
-    if trend.trend_strength == "strong":
-        score += 1
-        factors += 1
-    elif trend.trend_strength == "weak":
-        score -= 0.5
-        factors += 1
-    
-    # Fundamental Analysis Score (ถ้ามีข้อมูล)
-    if fundamental.pe_ratio and fundamental.pe_ratio < 20:
-        score += 1
-        factors += 1
-    elif fundamental.pe_ratio and fundamental.pe_ratio > 30:
-        score -= 1
-        factors += 1
-    
-    if fundamental.peg_ratio and fundamental.peg_ratio < 1:
-        score += 1
-        factors += 1
-    elif fundamental.peg_ratio and fundamental.peg_ratio > 2:
-        score -= 1
-        factors += 1
-    
-    if fundamental.roe and fundamental.roe > 15:
-        score += 1
-        factors += 1
-    elif fundamental.roe and fundamental.roe < 10:
-        score -= 1
-        factors += 1
-    
-    # สรุป recommendation
-    if factors == 0:
-        return {"action": "hold", "confidence": 0.5}
-    
-    avg_score = score / factors
-    
-    if avg_score >= 0.5:
-        action = "buy"
-    elif avg_score <= -0.5:
-        action = "sell"
-    else:
-        action = "hold"
-    
-    confidence = min(abs(avg_score) + 0.5, 1.0)
-    
-    return {"action": action, "confidence": confidence}
-
-# Batch Analysis Endpoint
-@app.post("/api/analysis/batch")
-async def batch_analysis(symbols: List[str], period: str = "1mo", interval: str = "1d"):
-    """วิเคราะห์หุ้นหลายตัวพร้อมกัน"""
-    results = []
-    
-    for symbol in symbols:
-        try:
-            # ดึงข้อมูล history
-            history = get_stock_history(symbol, period, interval)
-            if not history:
-                results.append({
-                    "symbol": symbol,
-                    "error": f"History for '{symbol}' not found"
-                })
-                continue
-            
-            # แปลงเป็น DataFrame
-            import pandas as pd
-            data = []
-            for item in history:
-                data.append({
-                    'Date': item.time,
-                    'Open': item.open,
-                    'High': item.high,
-                    'Low': item.low,
-                    'Close': item.close,
-                    'Volume': item.volume
-                })
-            
-            df = pd.DataFrame(data)
-            df['Date'] = pd.to_datetime(df['Date'])
-            df.set_index('Date', inplace=True)
-            
-            # ดึงข้อมูล info สำหรับ fundamental
-            info = get_stock_info(symbol)
-            info_dict = None
-            if info:
-                info_dict = {
-                    "trailingPE": info.pe_ratio,
-                    "pegRatio": None,
-                    "priceToBook": None,
-                    "returnOnEquity": None,
-                    "debtToEquity": None,
-                    "currentRatio": None,
-                    "quickRatio": None,
-                    "grossMargins": None,
-                    "operatingMargins": None,
-                    "profitMargins": None,
-                    "revenueGrowth": None,
-                    "earningsGrowth": None,
-                    "marketCap": info.market_cap,
-                    "totalRevenue": None
-                }
-            
-            # คำนวณ analysis
-            fundamental = calculate_fundamental_analysis(df, symbol, info_dict)
-            technical = calculate_technical_analysis(df, symbol)
-            trend = calculate_trend_analysis(df, symbol)
-            
-            # สร้าง recommendation
-            recommendation = generate_recommendation(fundamental, technical, trend)
-            
-            results.append({
-                "symbol": symbol,
-                "fundamental": fundamental,
-                "technical": technical,
-                "trend": trend,
-                "recommendation": recommendation["action"],
-                "confidence": recommendation["confidence"]
-            })
-            
-            # Rate limiting ระหว่าง symbols
-            await asyncio.sleep(2)
-            
-        except Exception as e:
-            results.append({
-                "symbol": symbol,
-                "error": str(e)
-            })
-    
-    return {"results": results}
+app.include_router(protected)

@@ -1,0 +1,5 @@
+# ตัวอย่าง cron — backup SQLite ทุกวัน 03:00
+# crontab -e แล้วเพิ่มบรรทัด (แก้ path):
+# 0 3 * * * /home/nate/Public/stock-analyzer/scripts/backup-db.sh >> /var/log/stock-analyzer-backup.log 2>&1
+
+0 3 * * * /path/to/stock-analyzer/scripts/backup-db.sh

@@ -1,0 +1,7 @@
+data/
+backend/data/
+backups/
+.env
+*.pyc
+.venv/
+venv/

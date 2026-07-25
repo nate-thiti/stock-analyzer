@@ -7,12 +7,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: '#0B0F19',
-        card: '#161C2C',
-        border: '#232D42',
-        primary: '#3B82F6',
-        success: '#10B981',
-        danger: '#EF4444',
+        background: 'var(--bg)',
+        card: 'var(--card)',
+        border: 'var(--border)',
+        primary: 'var(--primary)',
+        accent: 'var(--accent)',
+        success: 'var(--success)',
+        danger: 'var(--danger)',
+        warning: 'var(--warning)',
+        foreground: 'var(--foreground)',
+        muted: 'var(--muted)',
+        surface: 'var(--surface)',
       }
     },
   },

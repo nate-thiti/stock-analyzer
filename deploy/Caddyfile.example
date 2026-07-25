@@ -1,0 +1,30 @@
+# ตัวอย่าง Caddy reverse proxy + HTTPS
+# 1. ติดตั้ง Caddy: https://caddyserver.com/docs/install
+# 2. คัดลอกและแก้โดเมน:
+#    cp deploy/Caddyfile.example /etc/caddy/Caddyfile
+# 3. ให้ Docker frontend bind 127.0.0.1:3010 (docker-compose.prod.yml)
+# 4. sudo systemctl reload caddy
+
+stocks.example.com {
+	encode gzip
+
+	# Frontend + API proxy (nginx ใน container ส่ง /api ไป backend อยู่แล้ว)
+	reverse_proxy 127.0.0.1:3010
+
+	# Security headers
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
+	log {
+		output file /var/log/caddy/stock-analyzer.log
+	}
+}
+
+# ถ้า expose backend โดยตรง (ไม่แนะนำ) — ใช้เฉพาะ debug:
+# api.stocks.example.com {
+# 	reverse_proxy 127.0.0.1:8010
+# }

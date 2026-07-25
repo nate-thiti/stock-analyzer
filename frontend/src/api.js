@@ -1,0 +1,238 @@
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
+export const DEFAULT_ACCOUNT_SIZE = 100_000;
+export const DEFAULT_RISK_PCT = 2;
+
+class AuthError extends Error {
+  constructor(message) {
+    super(message);
+    this.isAuthError = true;
+  }
+}
+
+async function fetchJSON(url, options = {}) {
+  const res = await fetch(`${API_BASE}${url}`, {
+    credentials: 'include',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+  if (res.status === 401) {
+    throw new AuthError('กรุณาเข้าสู่ระบบ');
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+export const api = {
+  login: (email, password) =>
+    fetchJSON('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  logout: () => fetchJSON('/auth/logout', { method: 'POST' }),
+  me: () => fetchJSON('/auth/me'),
+
+  listUsers: () => fetchJSON('/users'),
+  createUser: (data) => fetchJSON('/users', { method: 'POST', body: JSON.stringify(data) }),
+  updateUser: (id, data) => fetchJSON(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteUser: (id) => fetchJSON(`/users/${id}`, { method: 'DELETE' }),
+
+  listFavorites: () => fetchJSON('/favorites'),
+  addFavorite: (symbol) => fetchJSON('/favorites', { method: 'POST', body: JSON.stringify({ symbol }) }),
+  removeFavorite: (symbol) => fetchJSON(`/favorites/${encodeURIComponent(symbol)}`, { method: 'DELETE' }),
+
+  listPositions: () => fetchJSON('/positions'),
+  createPosition: (data) => fetchJSON('/positions', { method: 'POST', body: JSON.stringify(data) }),
+  updatePosition: (id, data) => fetchJSON(`/positions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePosition: (id) => fetchJSON(`/positions/${id}`, { method: 'DELETE' }),
+
+  getWatchlist: () => fetchJSON('/watchlist'),
+  setWatchlist: (symbols) => fetchJSON('/watchlist', { method: 'PUT', body: JSON.stringify({ symbols }) }),
+
+  quote: (symbol) => fetchJSON(`/stock/quote?symbol=${encodeURIComponent(symbol)}`),
+  info: (symbol) => fetchJSON(`/stock/info?symbol=${encodeURIComponent(symbol)}`),
+  history: (symbol, period, interval) =>
+    fetchJSON(`/stock/history?symbol=${encodeURIComponent(symbol)}&period=${period}&interval=${interval}`),
+  search: (q) => fetchJSON(`/stock/search?q=${encodeURIComponent(q)}`),
+  analysis: (symbol, period, interval, accountSize = DEFAULT_ACCOUNT_SIZE, riskPct = DEFAULT_RISK_PCT) =>
+    fetchJSON(
+      `/analysis/full?symbol=${encodeURIComponent(symbol)}&period=${period}&interval=${interval}` +
+      `&account_size=${accountSize}&risk_pct=${riskPct}`
+    ),
+  compare: (symbols, period, interval, accountSize = DEFAULT_ACCOUNT_SIZE, riskPct = DEFAULT_RISK_PCT) =>
+    fetchJSON(
+      `/analysis/compare?symbols=${encodeURIComponent(symbols)}&period=${period}&interval=${interval}` +
+      `&account_size=${accountSize}&risk_pct=${riskPct}`
+    ),
+  quarterlyFundamentals: (symbol) =>
+    fetchJSON(`/stock/fundamentals/quarterly?symbol=${encodeURIComponent(symbol)}`),
+  peHistory: (symbol, period = '2y') =>
+    fetchJSON(`/stock/fundamentals/pe-history?symbol=${encodeURIComponent(symbol)}&period=${period}`),
+  marketSignals: (refresh = false, scope = 'global') => {
+    const params = new URLSearchParams();
+    if (refresh) params.set('refresh', 'true');
+    if (scope === 'personal') params.set('scope', 'personal');
+    const qs = params.toString();
+    return fetchJSON(`/analysis/market-signals${qs ? `?${qs}` : ''}`);
+  },
+};
+
+export { AuthError };
+
+export const POPULAR_STOCKS = [
+  { symbol: 'AAPL', name: 'Apple', market: 'US' },
+  { symbol: 'MSFT', name: 'Microsoft', market: 'US' },
+  { symbol: 'NVDA', name: 'NVIDIA', market: 'US' },
+  { symbol: 'TSLA', name: 'Tesla', market: 'US' },
+  { symbol: 'PTT.BK', name: 'PTT', market: 'TH' },
+  { symbol: 'CPALL.BK', name: 'CP ALL', market: 'TH' },
+  { symbol: '0700.HK', name: 'Tencent', market: 'HK' },
+  { symbol: 'BABA', name: 'Alibaba', market: 'CN' },
+  { symbol: 'GOOGL', name: 'Alphabet', market: 'US' },
+  { symbol: 'AMZN', name: 'Amazon', market: 'US' },
+];
+
+export const COMPARE_PRESET_GROUPS = [
+  {
+    title: 'เทคโนโลยี',
+    presets: [
+      { label: 'Big Tech', symbols: ['AAPL', 'MSFT', 'GOOGL'] },
+      { label: 'Chips', symbols: ['NVDA', 'AMD', 'INTC'] },
+      { label: 'Cloud & AI', symbols: ['AMZN', 'META', 'CRM'] },
+      { label: 'China Tech', symbols: ['BABA', 'JD', 'PDD'] },
+    ],
+  },
+  {
+    title: 'พลังงาน & โครงสร้างพื้นฐาน',
+    presets: [
+      { label: 'พลังงาน', symbols: ['XOM', 'CVX', 'COP'] },
+      { label: 'พลังงานไทย', symbols: ['PTT.BK', 'PTTEP.BK', 'TOP.BK'] },
+      { label: 'สาธารณูปโภ', symbols: ['NEE', 'DUK', 'SO'] },
+      { label: 'โทรคม', symbols: ['VZ', 'T', 'TMUS'] },
+    ],
+  },
+  {
+    title: 'ผู้บริโภค',
+    presets: [
+      { label: 'สินค้าฟุ่มเฟือย', symbols: ['LVMUY', 'EL', 'TPR'] },
+      { label: 'สินค้าอุปโภค', symbols: ['PG', 'KO', 'PEP'] },
+      { label: 'ค้าปลีก', symbols: ['WMT', 'COST', 'TGT'] },
+      { label: 'ร้านอาหาร', symbols: ['MCD', 'SBUX', 'YUM'] },
+    ],
+  },
+  {
+    title: 'การเงิน & สุขภาพ',
+    presets: [
+      { label: 'ธนาคาร', symbols: ['JPM', 'BAC', 'GS'] },
+      { label: 'ธนาคารไทย', symbols: ['KBANK.BK', 'SCB.BK', 'BBL.BK'] },
+      { label: 'สุขภาพ', symbols: ['JNJ', 'UNH', 'LLY'] },
+      { label: 'ยา & Biotech', symbols: ['PFE', 'MRK', 'ABBV'] },
+    ],
+  },
+  {
+    title: 'อุตสาหกรรม & อื่นๆ',
+    presets: [
+      { label: 'รถยนต์ & EV', symbols: ['TSLA', 'TM', 'F'] },
+      { label: 'อุตสาหกรรม', symbols: ['CAT', 'DE', 'HON'] },
+      { label: 'วัสดุ & เหมือง', symbols: ['FCX', 'NEM', 'BHP'] },
+      { label: 'อสังหา REIT', symbols: ['PLD', 'AMT', 'O'] },
+    ],
+  },
+  {
+    title: 'ตลาดเอเชีย',
+    presets: [
+      { label: 'SET ยอดนิยม', symbols: ['PTT.BK', 'CPALL.BK', 'AOT.BK'] },
+      { label: 'SET ค้าปลีก', symbols: ['CPALL.BK', 'HMPRO.BK', 'CRC.BK'] },
+      { label: 'Hong Kong', symbols: ['0700.HK', '9988.HK', '3690.HK'] },
+    ],
+  },
+];
+
+export const COMPARE_PRESETS = COMPARE_PRESET_GROUPS.flatMap((g) => g.presets);
+
+export function formatMarketCap(num) {
+  if (!num) return '-';
+  if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
+  if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+  if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+  return num.toLocaleString();
+}
+
+export function formatPct(val, decimals = 1) {
+  if (val == null) return '-';
+  const pct = Math.abs(val) < 1 ? val * 100 : val;
+  return pct.toFixed(decimals) + '%';
+}
+
+const MARKET_STATE_LABELS = {
+  REGULAR: 'ตลาดเปิด',
+  CLOSED: 'ตลาดปิด',
+  PRE: 'Pre-market',
+  POST: 'After-hours',
+  PREPRE: 'ตลาดปิด',
+  POSTPOST: 'ตลาดปิด',
+};
+
+export function formatMarketTime(iso, timezone, marketState) {
+  if (!iso) return { time: '-', state: null };
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return { time: iso, state: marketState };
+
+  const time = date.toLocaleString('th-TH', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: timezone || undefined,
+  });
+
+  return {
+    time,
+    state: MARKET_STATE_LABELS[marketState] || marketState || null,
+  };
+}
+
+export function formatFetchedAt(iso, timezone) {
+  if (!iso) return '-';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString('th-TH', {
+    dateStyle: 'short',
+    timeStyle: 'medium',
+    timeZone: timezone || undefined,
+  });
+}
+
+export function formatHistoryDate(rawTime, timezone) {
+  if (!rawTime) return '-';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawTime)) {
+    const [y, m, d] = rawTime.split('-').map(Number);
+    const date = new Date(Date.UTC(y, m - 1, d));
+    return date.toLocaleDateString('th-TH', {
+      dateStyle: 'medium',
+      timeZone: timezone || 'UTC',
+    });
+  }
+  const date = new Date(rawTime);
+  if (Number.isNaN(date.getTime())) return rawTime;
+  return date.toLocaleString('th-TH', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: timezone || undefined,
+  });
+}
+
+export const GRADE_LABELS = {
+  undervalued: { label: 'ถูก', color: 'text-success' },
+  fair: { label: 'เหมาะสม', color: 'text-primary' },
+  neutral: { label: 'กลางๆ', color: 'text-warning' },
+  overvalued: { label: 'แพง', color: 'text-danger' },
+};
+
+export const ACTION_STYLES = {
+  buy: { bg: 'bg-success/10', border: 'border-success/30', text: 'text-success' },
+  sell: { bg: 'bg-danger/10', border: 'border-danger/30', text: 'text-danger' },
+  hold: { bg: 'bg-warning/10', border: 'border-warning/30', text: 'text-warning' },
+};
