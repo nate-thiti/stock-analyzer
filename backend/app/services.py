@@ -160,7 +160,7 @@ def _dividends_from_yf(ticker) -> List[dict]:
         if divs is None or divs.empty:
             return []
         items = []
-        for date, amount in divs.tail(8).items():
+        for date, amount in divs.tail(20).items():
             items.append({
                 "ex_date": str(date.date()) if hasattr(date, "date") else str(date),
                 "amount": float(amount),
@@ -315,12 +315,17 @@ def get_stock_info(symbol: str, price: Optional[float] = None, history_df=None) 
     ticker = _get_ticker(cleaned)
     info = ticker.info or {}
 
+    dividends = raw.dividends or []
+    annual_dividend = round(sum(d["amount"] for d in dividends[:4]), 4) if dividends else None
+
     return StockInfo(
         symbol=cleaned,
         name=raw.name,
         summary=raw.summary,
         industry=raw.industry,
         sector=raw.sector,
+        dividends=dividends,
+        annual_dividend=annual_dividend,
         pe_ratio=metrics.get("pe_ratio"),
         forward_pe=metrics.get("forward_pe"),
         peg_ratio=metrics.get("peg_ratio"),

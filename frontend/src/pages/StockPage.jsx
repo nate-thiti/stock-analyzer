@@ -6,9 +6,14 @@ import {
 } from 'lucide-react';
 import { api, formatHistoryDate, formatMarketCap, formatMarketTime, formatFetchedAt, formatPct } from '../api';
 import { useQuotePoll, ANALYSIS_POLL_MS } from '../hooks/useQuotePoll';
+import { usePriceAlerts } from '../hooks/usePriceAlerts';
+import { addRecentStock } from '../utils/recentStocks';
 import StarButton from '../components/StarButton';
 import StockChart from '../components/StockChart';
 import ValuationPanel from '../components/valuation/ValuationPanel';
+import PriceAlertButton from '../components/PriceAlertButton';
+import DividendPanel from '../components/DividendPanel';
+import SelectField from '../components/SelectField';
 
 export default function StockPage() {
   const { symbol } = useParams();
@@ -26,6 +31,14 @@ export default function StockPage() {
   const [peHistory, setPeHistory] = useState([]);
   const [valuationChartsLoading, setValuationChartsLoading] = useState(false);
   const [position, setPosition] = useState(null);
+  const { alerts, load: reloadAlerts } = usePriceAlerts();
+
+  useEffect(() => {
+    if (symbol) {
+      addRecentStock(symbol);
+      window.dispatchEvent(new Event('recent-stocks-updated'));
+    }
+  }, [symbol]);
 
   const refreshQuote = useCallback(async () => {
     if (!symbol) return;
@@ -190,6 +203,12 @@ export default function StockPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <h2 className="text-2xl font-black text-foreground">{quote.symbol}</h2>
                     <StarButton symbol={quote.symbol} />
+                    <PriceAlertButton
+                      symbol={quote.symbol}
+                      currentPrice={quote.price}
+                      alerts={alerts}
+                      onChange={reloadAlerts}
+                    />
                     <span className="text-sm text-muted">{quote.name}</span>
                   </div>
                   <div className="flex items-baseline gap-3">
@@ -233,10 +252,20 @@ export default function StockPage() {
               ) : null}
 
               <div className="flex gap-2">
-                <Select label="ช่วงเวลา" value={period} onChange={setPeriod}
-                  options={[['1mo','1 เดือน'],['3mo','3 เดือน'],['6mo','6 เดือน'],['1y','1 ปี'],['5y','5 ปี']]} />
-                <Select label="แท่งเทียน" value={candleInterval} onChange={setCandleInterval}
-                  options={[['1d','รายวัน'],['1wk','รายสัปดาห์'],['1h','1 ชม.'],['15m','15 นาที']]} />
+                <SelectField
+                  label="ช่วงเวลา"
+                  value={period}
+                  onChange={setPeriod}
+                  size="sm"
+                  options={[['1mo', '1 เดือน'], ['3mo', '3 เดือน'], ['6mo', '6 เดือน'], ['1y', '1 ปี'], ['5y', '5 ปี']]}
+                />
+                <SelectField
+                  label="แท่งเทียน"
+                  value={candleInterval}
+                  onChange={setCandleInterval}
+                  size="sm"
+                  options={[['1d', 'รายวัน'], ['1wk', 'รายสัปดาห์'], ['1h', '1 ชม.'], ['15m', '15 นาที']]}
+                />
               </div>
             </div>
 
@@ -282,6 +311,15 @@ export default function StockPage() {
         )}
       </div>
 
+      {info && (info.dividends?.length > 0 || info.annual_dividend) && (
+        <DividendPanel
+          dividends={info.dividends || []}
+          annualDividend={info.annual_dividend}
+          dividendYield={info.dividend_yield}
+          currency={currency}
+        />
+      )}
+
       {analysisLoading && !analysis && (
         <div className="glass-card rounded-2xl p-6 flex items-center gap-3 text-sm text-muted">
           <Loader2 size={16} className="animate-spin text-primary" />
@@ -303,21 +341,6 @@ export default function StockPage() {
           position={position}
         />
       )}
-    </div>
-  );
-}
-
-function Select({ label, value, onChange, options }) {
-  return (
-    <div>
-      <span className="text-[9px] text-muted font-bold uppercase">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="block mt-0.5 bg-surface border border-border rounded-xl text-xs py-2 px-3 text-foreground focus:outline-none focus:border-primary cursor-pointer"
-      >
-        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-      </select>
     </div>
   );
 }

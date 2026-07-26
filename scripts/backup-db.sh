@@ -7,6 +7,29 @@ TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 
 mkdir -p "$BACKUP_DIR"
 
+# Load DATABASE_URL from .env if present
+if [ -f "$ROOT/.env" ]; then
+  # shellcheck disable=SC1091
+  set -a
+  source "$ROOT/.env"
+  set +a
+fi
+
+DATABASE_URL="${DATABASE_URL:-sqlite:////data/app.db}"
+
+if [[ "$DATABASE_URL" == postgresql* ]]; then
+  if ! command -v pg_dump >/dev/null 2>&1; then
+    echo "pg_dump not found — install postgresql-client or set DATABASE_URL to SQLite" >&2
+    exit 1
+  fi
+  OUT="$BACKUP_DIR/neondb_${TIMESTAMP}.sql"
+  PG_URL="${DATABASE_URL/postgresql+psycopg/postgresql}"
+  pg_dump "$PG_URL" > "$OUT"
+  echo "Backed up Postgres to $OUT"
+  ls -1t "$BACKUP_DIR"/neondb_*.sql 2>/dev/null | tail -n +15 | xargs -r rm --
+  exit 0
+fi
+
 if docker compose -f "$ROOT/docker-compose.yml" ps backend 2>/dev/null | grep -q "Up"; then
   COMPOSE_FILES="-f $ROOT/docker-compose.yml"
   if [ -f "$ROOT/docker-compose.prod.yml" ] && docker compose $COMPOSE_FILES -f "$ROOT/docker-compose.prod.yml" ps backend 2>/dev/null | grep -q "Up"; then
@@ -23,5 +46,4 @@ else
   exit 1
 fi
 
-# Keep last 14 backups
 ls -1t "$BACKUP_DIR"/app_*.db 2>/dev/null | tail -n +15 | xargs -r rm --

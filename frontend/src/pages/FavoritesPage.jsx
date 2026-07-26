@@ -4,9 +4,12 @@ import { Star, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react';
 import { api } from '../api';
 import { useFavorites } from '../context/FavoritesContext';
 import { useQuotePoll } from '../hooks/useQuotePoll';
+import { usePriceAlerts } from '../hooks/usePriceAlerts';
+import PriceAlertButton, { AlertTriggeredBadge } from '../components/PriceAlertButton';
 
 export default function FavoritesPage() {
   const { favorites, loading: favLoading } = useFavorites();
+  const { alerts, load: reloadAlerts, triggered } = usePriceAlerts();
 
   return (
     <div className="space-y-6">
@@ -17,6 +20,12 @@ export default function FavoritesPage() {
         </h2>
         <p className="text-sm text-muted mt-1">รายการหุ้นที่คุณบันทึกไว้</p>
       </div>
+
+      {triggered.length > 0 && (
+        <div className="glass-card rounded-xl p-3 border border-warning/30 bg-warning/5 text-xs text-warning">
+          มี {triggered.length} alert ถึงราคาเป้าแล้ว — ดูที่การ์ดหุ้นด้านล่าง
+        </div>
+      )}
 
       {favLoading ? (
         <div className="flex justify-center py-12">
@@ -32,7 +41,7 @@ export default function FavoritesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {favorites.map((f) => (
-            <FavoriteCard key={f.symbol} symbol={f.symbol} />
+            <FavoriteCard key={f.symbol} symbol={f.symbol} alerts={alerts} onAlertChange={reloadAlerts} />
           ))}
         </div>
       )}
@@ -40,9 +49,10 @@ export default function FavoritesPage() {
   );
 }
 
-function FavoriteCard({ symbol }) {
+function FavoriteCard({ symbol, alerts, onAlertChange }) {
   const [quote, setQuote] = useState(null);
   const { toggle } = useFavorites();
+  const hasTriggered = alerts.some((a) => a.symbol === symbol && a.triggered);
 
   const refreshQuote = useCallback(async () => {
     try {
@@ -58,16 +68,20 @@ function FavoriteCard({ symbol }) {
 
   return (
     <Link to={`/stock/${symbol}`} className="glass-card rounded-2xl p-5 hover:border-primary/50 transition-all group relative">
-      <button
-        type="button"
-        onClick={(e) => { e.preventDefault(); toggle(symbol); }}
-        className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-warning/10 transition-colors"
-        aria-label="เอาดาวออก"
-      >
-        <Star size={18} className="text-warning fill-warning" />
-      </button>
+      <div className="absolute top-4 right-4 flex items-center gap-1">
+        <PriceAlertButton symbol={symbol} currentPrice={quote?.price} alerts={alerts} onChange={onAlertChange} compact />
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); toggle(symbol); }}
+          className="p-1.5 rounded-lg hover:bg-warning/10 transition-colors"
+          aria-label="เอาดาวออก"
+        >
+          <Star size={18} className="text-warning fill-warning" />
+        </button>
+      </div>
 
       <p className="font-mono font-black text-xl text-foreground">{symbol}</p>
+      {hasTriggered && <div className="mt-1"><AlertTriggeredBadge show /></div>}
       {quote?.name && <p className="text-xs text-muted truncate mt-0.5">{quote.name}</p>}
 
       {quote ? (

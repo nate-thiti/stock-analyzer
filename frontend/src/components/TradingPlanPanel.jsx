@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Activity, Shield, Target, Wallet, Layers, Calendar, AlertCircle, Package, ShoppingCart } from 'lucide-react';
 import { ACTION_STYLES } from '../api';
+import SegmentedControl from './SegmentedControl';
 
 const POSITION_MODES = {
   holding: { id: 'holding', label: 'ถืออยู่แล้ว', icon: Package },
@@ -151,23 +152,18 @@ export default function TradingPlanPanel({ plan, currency, embedded = false, pos
         </p>
       </div>
 
-      <div className="flex gap-2 mb-4 p-1 bg-surface/60 rounded-xl border border-border/40">
-        {Object.values(POSITION_MODES).map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setPositionMode(id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-[11px] font-semibold transition-colors ${
-              positionMode === id
-                ? 'bg-primary/15 text-primary border border-primary/30'
-                : 'text-muted hover:text-foreground'
-            }`}
-          >
-            <Icon size={13} />
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        value={positionMode}
+        onChange={setPositionMode}
+        className="mb-4"
+        size="md"
+        fullWidth
+        options={Object.values(POSITION_MODES).map(({ id, label, icon }) => ({
+          value: id,
+          label,
+          icon,
+        }))}
+      />
 
       <div className="flex items-center justify-between mb-3">
         <div>

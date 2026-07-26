@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import {
-  Activity, BarChart3, GitCompare, Home, Sparkles, Star, Shield,
+  BarChart3, GitCompare, Home, Star, Shield,
   LogOut, User, Menu, X, Briefcase,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
+import SupportButton from './SupportButton';
+import { BrandLockup } from './BrandLogo';
 import { useAuth } from '../context/AuthContext';
 
 export default function Layout() {
@@ -60,19 +62,11 @@ export default function Layout() {
         style={{ background: 'var(--header-bg)' }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-          <Link to="/" className="flex items-center gap-2.5 sm:gap-3 shrink-0 min-w-0 group">
-            <div className="relative bg-gradient-primary p-2 sm:p-2.5 rounded-xl text-white shadow-lg animate-glow group-hover:scale-110 transition-transform duration-300 shrink-0">
-              <Activity size={18} className="relative z-10 sm:w-5 sm:h-5" />
-              <Sparkles size={10} className="absolute -top-1 -right-1 text-yellow-300 animate-pulse-ring" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-sm sm:text-base font-bold text-foreground truncate">
-                <span className="text-gradient">Stock</span> Analyzer
-              </h1>
-              <p className="hidden sm:block text-[9px] text-muted font-mono uppercase tracking-widest">
-                Global Markets
-              </p>
-            </div>
+          <Link to="/" className="shrink-0 min-w-0 group">
+            <BrandLockup
+              iconSize={36}
+              className="group-hover:scale-[1.02] transition-transform duration-300"
+            />
           </Link>
 
           {/* Desktop nav */}
@@ -109,11 +103,13 @@ export default function Layout() {
             >
               <LogOut size={16} />
             </button>
+            <SupportButton />
             <ThemeToggle />
           </div>
 
-          {/* Mobile: theme + hamburger */}
+          {/* Mobile: support + theme + hamburger */}
           <div className="flex md:hidden items-center gap-2 shrink-0">
+            <SupportButton compact />
             <ThemeToggle />
             <button
               type="button"
@@ -169,6 +165,8 @@ export default function Layout() {
                 </Link>
               )}
             </div>
+
+            <SupportButton className="w-full justify-center mt-2" />
 
             <button
               type="button"

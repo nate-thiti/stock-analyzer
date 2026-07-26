@@ -8,6 +8,12 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=2, max_length=64)
+    email: EmailStr
+    password: str = Field(..., min_length=6)
+
+
 class UserOut(BaseModel):
     id: int
     username: str
@@ -70,10 +76,32 @@ class PositionUpdate(BaseModel):
 class PositionWithQuote(PositionOut):
     current_price: Optional[float] = None
     currency: Optional[str] = "USD"
+    name: Optional[str] = None
+    sector: Optional[str] = None
     market_value: Optional[float] = None
     cost_basis: Optional[float] = None
     unrealized_pnl: Optional[float] = None
     unrealized_pnl_pct: Optional[float] = None
+
+
+class PriceAlertOut(BaseModel):
+    id: int
+    symbol: str
+    target_price: float
+    direction: str
+    triggered_at: Optional[datetime] = None
+    created_at: datetime
+    current_price: Optional[float] = None
+    triggered: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class PriceAlertCreate(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=32)
+    target_price: float = Field(..., gt=0)
+    direction: str = Field(..., pattern="^(above|below)$")
 
 
 class WatchlistOut(BaseModel):

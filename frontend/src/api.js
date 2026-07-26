@@ -24,7 +24,11 @@ async function fetchJSON(url, options = {}) {
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `HTTP ${res.status}`);
+    const detail = err.detail;
+    const message = Array.isArray(detail)
+      ? detail.map((d) => d.msg).join(', ')
+      : (detail || `HTTP ${res.status}`);
+    throw new Error(message);
   }
   if (res.status === 204) return null;
   return res.json();
@@ -33,6 +37,8 @@ async function fetchJSON(url, options = {}) {
 export const api = {
   login: (email, password) =>
     fetchJSON('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  register: (username, email, password) =>
+    fetchJSON('/auth/register', { method: 'POST', body: JSON.stringify({ username, email, password }) }),
   logout: () => fetchJSON('/auth/logout', { method: 'POST' }),
   me: () => fetchJSON('/auth/me'),
 
@@ -49,6 +55,10 @@ export const api = {
   createPosition: (data) => fetchJSON('/positions', { method: 'POST', body: JSON.stringify(data) }),
   updatePosition: (id, data) => fetchJSON(`/positions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deletePosition: (id) => fetchJSON(`/positions/${id}`, { method: 'DELETE' }),
+
+  listPriceAlerts: () => fetchJSON('/price-alerts'),
+  createPriceAlert: (data) => fetchJSON('/price-alerts', { method: 'POST', body: JSON.stringify(data) }),
+  deletePriceAlert: (id) => fetchJSON(`/price-alerts/${id}`, { method: 'DELETE' }),
 
   getWatchlist: () => fetchJSON('/watchlist'),
   setWatchlist: (symbols) => fetchJSON('/watchlist', { method: 'PUT', body: JSON.stringify({ symbols }) }),

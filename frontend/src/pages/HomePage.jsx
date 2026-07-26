@@ -6,6 +6,7 @@ import { useQuotePoll, HOME_POLL_MS } from '../hooks/useQuotePoll';
 import StarButton from '../components/StarButton';
 import MarketSignalSections from '../components/MarketSignalSections';
 import QuickCompareSection from '../components/QuickCompareSection';
+import RecentStocksSection from '../components/RecentStocksSection';
 
 export default function HomePage() {
   const [query, setQuery] = useState('');
@@ -78,6 +79,8 @@ export default function HomePage() {
           </div>
         )}
       </section>
+
+      <RecentStocksSection />
 
       <section>
         <h3 className="text-xs font-bold text-muted uppercase tracking-wider mb-4 flex items-center gap-2">

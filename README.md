@@ -8,6 +8,7 @@
 
 ### หน้าแรก (`/`)
 - ค้นหาหุ้นและดูการ์ดราคายอดนิยม
+- **ดูล่าสุด** — หุ้นที่เปิดล่าสุด (localStorage, สูงสุด 10) ลบรายการได้ด้วยปุ่ม ×
 - **Market Signals** — สแกน watchlist แยกกลุ่ม ซื้อ / ถือ / ขาย
   - **Watchlist ทั่วไป** (admin ตั้งได้) หรือ **รายการโปรด** ของ user
   - ถ้าไม่มีรายการโปรด → fallback เป็น watchlist ทั่วไป
@@ -20,16 +21,20 @@
 - **กราฟเทคนิคอัตโนมัติ** — EMA 9/21/50, RSI, MACD, Support/Resistance, ป้ายเทรนด์ (hover `?` อธิบายคำศัพท์)
 - กราฟปรับขนาดบนมือถือ (แผน RSI/MACD เล็กลง)
 - **Valuation** — P/E, PEG, P/S, P/B, ROE, radar chart, งบรายไตรมาส, ประวัติ P/E
+- **เงินปันผล** — ประวัติงวด, ประมาณการ/ปี, Div Yield
 - **Trading Plan** — คำแนะนำซื้อ/ถือ/ขาย, stop loss, target, position sizing, DCA
 - สลับโหมด **"ถืออยู่แล้ว" / "ยังไม่ได้ซื้อ"** สำหรับคำแนะนำที่ต่างกัน
 - ราคาอัปเดตอัตโนมัติทุก **30 วินาที**, กราฟทุก **5 นาที**, วิเคราะห์ทุก **5 นาที**
 - แสดง **เวลาซื้อขายล่าสุด** (จาก Yahoo) และ **เวลาที่ดึงข้อมูล** (`fetched_at`) แยกกัน
-- ปุ่ม ⭐ เพิ่มรายการโปรด
+- ปุ่ม ⭐ เพิ่มรายการโปรด, **Price Alert** ตั้งแจ้งเตือนเมื่อราคาถึงเป้า
+- Banner แสดงถ้าถือหุ้นในพอร์ต
 
 ### พอร์ต (`/portfolio`)
 - บันทึกหุ้นที่ถือ: **สัญลักษณ์ + จำนวน + ราคาซื้อเฉลี่ย**
 - แสดงมูลค่าปัจจุบัน, กำไร/ขาดทุน unrealized (%)
-- แก้ไข / ลบรายการ
+- **Dashboard** — pie chart สัดส่วนตามหุ้น, bar chart ตาม sector, การ์ดกำไร/ขาดทุนสูงสุด
+- **Price Alert** ต่อหุ้น + แบนเนอร์แจ้งเตือนที่ trigger แล้ว
+- แก้ไข / ลบรายการ — ราคาอัปเดต auto **30s**
 
 ### เปรียบเทียบ (`/compare`)
 - เลือก 2–5 หุ้น เปรียบ side-by-side
@@ -39,18 +44,28 @@
 
 ### รายการโปรด (`/favorites`)
 - หุ้นที่บันทึกไว้ พร้อมราคาอัปเดตอัตโนมัติทุก 30 วินาที
+- **Price Alert** ต่อหุ้น + badge เมื่อถึงราคาเป้า
 
 ### ระบบผู้ใช้
-- Login ด้วย JWT (HttpOnly cookie)
+- **สมัครสมาชิก** (`/register`) — username + email + password (ไม่ใช้ OAuth)
+- **Login** (`/login`) ด้วย JWT (HttpOnly cookie)
+- สมัคร/ล็อกอินแล้วเข้าใช้งานทันที (auto session)
 - **Super Admin** — จัดการผู้ใช้ + **Watchlist ทั่วไป** ที่ `/admin`
-- SQLite เก็บ users, favorites, positions, watchlist
-- API ส่วนใหญ่ต้อง login (ยกเว้น `/api/auth/login`)
+- **Neon Postgres** (แนะนำ) หรือ SQLite — เก็บ users, favorites, positions, watchlist, price_alerts
+- API ส่วนใหญ่ต้อง login (ยกเว้น `/api/auth/login`, `/api/auth/register`, `/api/config/public`)
+
+### Price Alerts
+- ตั้งเงื่อนไข **ราคา ≥ เป้า** หรือ **ราคา ≤ เป้า**
+- ตรวจอัตโนมัติทุก **30 วินาที** — แสดง badge เมื่อ trigger
+- ตั้งได้จากหน้าหุ้น, พอร์ต, รายการโปรด (modal กลางจอ)
 
 ### UI / UX
 - Dark/Light theme
 - พื้นหลัง 3D (Three.js) แบบ full-screen
+- Logo + favicon แบบ candlestick (SVG)
+- Custom **SelectField** dropdown และ **SegmentedControl** ทั้งระบบ
 - Responsive + เมนู hamburger บนมือถือ
-- ฟอนต์ขนาดใหญ่ขึ้นสำหรับอ่านง่าย
+- ปุ่ม **Ko-fi / สนับสนุน** ใน header, เมนูมือถือ, หน้า login/register
 
 ---
 
@@ -58,13 +73,14 @@
 
 | ชั้น | เทคโนโลยี |
 |------|-----------|
-| Backend | Python 3.10, FastAPI, Uvicorn, yfinance, pandas, SQLAlchemy, SQLite |
+| Backend | Python 3.10, FastAPI, Uvicorn, yfinance, pandas, SQLAlchemy, **PostgreSQL (Neon)** / SQLite |
 | Frontend | React 19, Vite 8, Tailwind CSS 4, React Router 7 |
 | Charts | Lightweight Charts (TradingView), Three.js |
 | Deploy | Docker Compose — nginx (frontend `:3010`) → FastAPI (`:8010`) |
 
 ```
-Browser → nginx :3010 → /api/* → FastAPI :8010 → yfinance / SQLite
+Browser → nginx :3010 → /api/* → FastAPI :8010 → yfinance / Neon Postgres
+                                              └→ SQLite (dev fallback)
 ```
 
 ---
@@ -74,54 +90,75 @@ Browser → nginx :3010 → /api/* → FastAPI :8010 → yfinance / SQLite
 ```text
 stock-analyzer/
 ├── docker-compose.yml
+├── docker-compose.prod.yml
 ├── .env.example
+├── deploy/
+│   ├── Caddyfile.example
+│   └── cron-backup.example
+├── scripts/
+│   ├── setup-production.sh
+│   ├── backup-db.sh
+│   └── test-all.sh
 ├── backend/
 │   ├── Dockerfile
 │   ├── requirements.txt
+│   ├── requirements-dev.txt
+│   ├── tests/
 │   └── app/
-│       ├── main.py              # FastAPI routes
-│       ├── services.py          # yfinance + cache
-│       ├── analysis.py          # fundamental / technical / trend
-│       ├── risk.py              # recommendation + trading plan
+│       ├── main.py
+│       ├── services.py
+│       ├── analysis.py
+│       ├── risk.py
 │       ├── fundamentals.py
 │       ├── valuation_charts.py
-│       ├── market_signals.py    # homepage watchlist scan
-│       ├── schemas.py           # Pydantic models
-│       ├── auth.py              # JWT + bcrypt
+│       ├── market_signals.py
+│       ├── auth.py
 │       ├── database.py
-│       ├── models.py            # User, Favorite
-│       ├── init_db.py           # migrate + seed superadmin
+│       ├── models.py
+│       ├── init_db.py
 │       └── routers/
 │           ├── auth.py
 │           ├── users.py
-│           └── favorites.py
+│           ├── favorites.py
+│           ├── positions.py
+│           ├── watchlist.py
+│           └── price_alerts.py
 └── frontend/
     ├── Dockerfile
-    ├── nginx.conf               # proxy /api → backend
+    ├── nginx.conf
+    ├── public/
+    │   └── favicon.svg
     └── src/
         ├── App.jsx
-        ├── api.js               # API client + presets
+        ├── api.js
+        ├── config.js
         ├── hooks/
-        │   └── useQuotePoll.js  # auto-refresh quotes
+        │   ├── useQuotePoll.js
+        │   ├── usePriceAlerts.js
+        │   └── useIsMobile.js
+        ├── utils/
+        │   ├── recentStocks.js
+        │   ├── chartIndicators.js
+        │   └── glossary.js
         ├── context/
-        │   ├── AuthContext.jsx
-        │   ├── FavoritesContext.jsx
-        │   └── ThemeContext.jsx
         ├── pages/
-        │   ├── HomePage.jsx
-        │   ├── StockPage.jsx
-        │   ├── ComparePage.jsx
-        │   ├── FavoritesPage.jsx
         │   ├── LoginPage.jsx
-        │   └── AdminPage.jsx
+        │   └── RegisterPage.jsx
         └── components/
             ├── Layout.jsx
+            ├── BrandLogo.jsx
             ├── StockChart.jsx
             ├── TradingPlanPanel.jsx
             ├── MarketSignalSections.jsx
-            ├── QuickCompareSection.jsx
-            ├── AnimatedBackground.jsx
-            └── valuation/         # charts & panels
+            ├── PortfolioDashboard.jsx
+            ├── PriceAlertButton.jsx
+            ├── RecentStocksSection.jsx
+            ├── DividendPanel.jsx
+            ├── SelectField.jsx
+            ├── SegmentedControl.jsx
+            ├── SupportButton.jsx
+            ├── Modal.jsx
+            └── valuation/
 ```
 
 ---
@@ -129,18 +166,33 @@ stock-analyzer/
 ## เริ่มต้นใช้งาน (Docker — แนะนำ)
 
 ```bash
-# 1. คัดลอก env (แก้ JWT_SECRET และรหัส admin ก่อน deploy จริง)
+# 1. คัดลอก env
 cp .env.example .env
 
-# 2. Build และรัน
+# 2. ตั้ง DATABASE_URL — Neon Postgres (แนะนำ)
+#    ไปที่ neon.tech → สร้าง project → copy connection string
+# DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST/neondb?sslmode=require
+#    หรือ SQLite สำหรับ dev แบบ offline:
+# DATABASE_URL=sqlite:////data/app.db
+
+# 3. แก้ JWT_SECRET และรหัส admin ก่อน deploy จริง
+
+# 4. Build และรัน
 docker compose up -d --build
 
-# 3. เปิดเบราว์เซอร์
+# 5. เปิดเบราว์เซอร์
 # Frontend: http://localhost:3010
 # Backend:  http://localhost:8010
 ```
 
-**Login เริ่มต้น (superadmin):**
+**บัญชีเริ่มต้น**
+
+| วิธี | รายละเอียด |
+|------|------------|
+| สมัครเอง | เปิด `/register` — สร้างบัญชี user ได้ทันที |
+| Super Admin | seed ครั้งแรกจาก `.env` (`SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD`) |
+
+**Login superadmin (ค่า default ใน `.env.example`):**
 
 | ฟิลด์ | ค่า default |
 |-------|-------------|
@@ -157,7 +209,7 @@ docker compose up -d --build
 
 ```bash
 cd backend
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
@@ -175,7 +227,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8010
 cd frontend
 npm install
 npm run dev
-# เปิด http://localhost:5173 (proxy /api → localhost:8010 ถ้ามีใน vite.config)
+# เปิด http://localhost:5173 (proxy /api → localhost:8010)
 ```
 
 ---
@@ -184,23 +236,56 @@ npm run dev
 
 | ตัวแปร | Default | คำอธิบาย |
 |--------|---------|----------|
-| `JWT_SECRET` | `change-me-in-production` | คีย์ลงนาม JWT |
+| `JWT_SECRET` | `change-me-in-production` | คีย์ลงนาม JWT (อย่างน้อย 32 ตัวอักษรใน production) |
 | `APP_ENV` | `development` | `development` หรือ `production` (production = ตรวจ security ตอน startup) |
 | `CORS_ORIGINS` | `*` | โดเมนที่อนุญาต (คั่นด้วยจุลภาค) |
 | `SUPERADMIN_USERNAME` | `admin` | ชื่อ superadmin ตอน seed |
 | `SUPERADMIN_EMAIL` | `admin@example.com` | อีเมล superadmin |
 | `SUPERADMIN_PASSWORD` | `admin1234` | รหัสผ่าน superadmin |
-| `DATABASE_URL` | `sqlite:////data/app.db` | SQLite path (Docker ใช้ volume `app-data`) |
-| `VITE_API_URL` | `/api` | Base URL ของ API (frontend build) |
+| `DATABASE_URL` | `sqlite:////data/app.db` | **Neon Postgres** (`postgresql+psycopg://...?sslmode=require`) หรือ SQLite |
+
+### ตั้ง Neon Postgres
+
+1. สมัคร [neon.tech](https://neon.tech) → สร้าง project
+2. Copy **connection string** (Direct หรือ Pooler — ใช้ pooler ได้)
+3. แปลงเป็น SQLAlchemy format ใน `.env`:
+
+```env
+DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST/neondb?sslmode=require
+```
+
+4. Restart backend — `init_db()` สร้างตาราง + seed superadmin/watchlist อัตโนมัติ
+
+> อย่า commit `.env` — เก็บ credentials ใน env เท่านั้น
+| `BMC_URL` | — | ลิงก์สนับสนุน (Ko-fi / Buy Me a Coffee) — แสดงปุ่มใน UI |
+| `VITE_BMC_URL` | — | (optional) ลิงก์สนับสนุนตอน build frontend — ถ้าไม่ตั้งจะอ่านจาก API |
+
+### ตั้งลิงก์ Ko-fi / Buy Me a Coffee
+
+```env
+# .env
+BMC_URL=https://ko-fi.com/yourname
+```
+
+```bash
+docker compose up -d   # restart backend — ไม่ต้อง rebuild frontend
+```
 
 ---
 
 ## API Endpoints
 
-### Auth (ไม่ต้อง login)
+### Public (ไม่ต้อง login)
 
 | Method | Path | คำอธิบาย |
 |--------|------|----------|
+| GET | `/api/config/public` | ค่า public เช่น `bmc_url` สำหรับปุ่มสนับสนุน |
+
+### Auth
+
+| Method | Path | คำอธิบาย |
+|--------|------|----------|
+| POST | `/api/auth/register` | สมัครสมาชิก → set HttpOnly cookie |
 | POST | `/api/auth/login` | เข้าสู่ระบบ → set HttpOnly cookie |
 | POST | `/api/auth/logout` | ออกจากระบบ |
 | GET | `/api/auth/me` | ข้อมูล user ปัจจุบัน |
@@ -226,10 +311,18 @@ npm run dev
 
 | Method | Path | คำอธิบาย |
 |--------|------|----------|
-| GET | `/api/positions` | รายการถือหุ้น + P/L |
+| GET | `/api/positions` | รายการถือหุ้น + P/L + sector |
 | POST | `/api/positions` | เพิ่ม `{ "symbol", "shares", "avg_cost" }` |
 | PUT | `/api/positions/{id}` | แก้ไขจำนวน/ราคาทุน |
 | DELETE | `/api/positions/{id}` | ลบ |
+
+### Price Alerts (login required)
+
+| Method | Path | คำอธิบาย |
+|--------|------|----------|
+| GET | `/api/price-alerts` | รายการ alert + สถานะ triggered |
+| POST | `/api/price-alerts` | สร้าง `{ "symbol", "target_price", "direction": "above\|below" }` |
+| DELETE | `/api/price-alerts/{id}` | ลบ alert |
 
 ### Watchlist (login required)
 
@@ -243,7 +336,7 @@ npm run dev
 | Method | Path | คำอธิบาย |
 |--------|------|----------|
 | GET | `/api/stock/quote?symbol=` | ราคาปัจจุบัน + `market_time` + `fetched_at` |
-| GET | `/api/stock/info?symbol=` | ข้อมูลบริษัท |
+| GET | `/api/stock/info?symbol=` | ข้อมูลบริษัท + dividends |
 | GET | `/api/stock/history?symbol=&period=&interval=` | OHLCV |
 | GET | `/api/stock/search?q=` | ค้นหาสัญลักษณ์ |
 | GET | `/api/stock/fundamentals/quarterly?symbol=` | งบรายไตรมาส |
@@ -265,14 +358,16 @@ npm run dev
 |------|-----------------|----------|
 | StockPage | ราคา | 30 วินาที |
 | StockPage | กราฟราคา | 5 นาที |
-| FavoritesPage | ราคา | 30 วินาที |
 | StockPage | วิเคราะห์ | 5 นาที |
+| FavoritesPage | ราคา | 30 วินาที |
+| PortfolioPage | ราคา + P/L | 30 วินาที |
+| Price Alerts | ตรวจ trigger | 30 วินาที |
 | HomePage Market Signals | สัญญาณ | 15 นาที |
-| HomePage | การ์ดราคา | 3 นาที |
+| HomePage | การ์ดราคา / ดูล่าสุด | 3 นาที |
 
 - กลับมาแท็บเบราว์เซอร์ → ดึงข้อมูลทันที
 - `market_time` = เวลาซื้อขายล่าสุดจาก Yahoo (อาจไม่เปลี่ยนเมื่อตลาดปิด)
-- `fetched_at` = เวลาที่ backend ดึงจาก Yahoo ล่าสุด (จะขยับทุก ~30 วิ)
+- `fetched_at` = เวลาที่ backend ดึงจาก Yahoo ล่าสุด
 
 ### Backend cache
 
@@ -282,6 +377,23 @@ npm run dev
 | History | 5 นาที |
 | Raw financials | 30 นาที |
 | Market signals | 15 นาที |
+
+### ดูล่าสุด (localStorage)
+
+- เก็บใน browser ของ user — ไม่ sync ข้ามเครื่อง
+- สูงสุด 10 หุ้น, ลบได้จากหน้าแรก
+
+---
+
+## Watchlist & Market Signals
+
+| แหล่ง | ใครตั้ง | ใช้เมื่อ |
+|-------|---------|---------|
+| Global | Super Admin ที่ `/admin` | Market Signals → "Watchlist ทั่วไป" |
+| Personal | ⭐ รายการโปรดของ user | Market Signals → "รายการโปรด" |
+| Fallback | Global | ถ้า user ไม่มีโปรด |
+
+Watchlist เริ่มต้น: `AAPL, MSFT, NVDA, GOOGL, AMZN, TSLA, META, AMD, INTC, PTT.BK, CPALL.BK, AOT.BK, KBANK.BK, 0700.HK, BABA`
 
 ---
 
@@ -301,10 +413,8 @@ total_score = fundamental × 0.45 + technical × 0.55
 - Stop loss / target จาก ATR และ support-resistance
 - Position sizing จาก `account_size` (default 100,000) และ `risk_pct` (default 2%)
 - DCA 3 งวด เมื่อสัญญาณซื้อ
-- โหมด "ถืออยู่แล้ว" แสดงคำแนะนำลด/เพิ่ม/ถือ แทนแผนซื้อใหม่
-
-### Market Signals Watchlist
-`AAPL, MSFT, NVDA, GOOGL, AMZN, TSLA, META, AMD, INTC, PTT.BK, CPALL.BK, AOT.BK, KBANK.BK, 0700.HK, BABA`
+- โหมด **"ถืออยู่แล้ว" / "ยังไม่ได้ซื้อ"** แสดงคำแนะนำที่ต่างกัน
+- ถ้าถือหุ้นในพอร์ต → ใช้ข้อมูล position จริงในแผน
 
 ---
 
@@ -332,7 +442,7 @@ total_score = fundamental × 0.45 + technical × 0.55
 
 ---
 
-## Production Deploy (Phase 2)
+## Production Deploy
 
 ### 1. ตั้งค่า environment
 
@@ -362,9 +472,11 @@ sudo systemctl reload caddy
 ### 4. Backup อัตโนมัติ
 
 ```bash
-bash scripts/backup-db.sh          # รัน manual
+bash scripts/backup-db.sh          # Postgres → pg_dump / SQLite → copy .db
 # cron รายวัน — ดู deploy/cron-backup.example
 ```
+
+> ใช้ Neon แล้ว — backup ผ่าน `pg_dump` (ต้องมี `postgresql-client` บน host) หรือใช้ Neon built-in backup
 
 ### Dev vs Production
 
@@ -375,69 +487,15 @@ bash scripts/backup-db.sh          # รัน manual
 | CORS | `*` OK | ต้องระบุโดเมน |
 | Ports | `:3010`, `:8010` เปิดทุก interface | bind `127.0.0.1` เท่านั้น |
 
----
+### Production Checklist
 
-## Production Checklist
-
-- [ ] เปลี่ยน `JWT_SECRET` เป็นค่าสุ่มยาว
+- [ ] ตั้ง `DATABASE_URL` เป็น Neon Postgres (production)
+- [ ] เปลี่ยน `JWT_SECRET` เป็นค่าสุ่มยาว (≥ 32 ตัวอักษร)
 - [ ] เปลี่ยน `SUPERADMIN_PASSWORD` ทันทีหลัง first login
 - [ ] ตั้ง `CORS_ORIGINS` เป็นโดเมนจริง (ไม่ใช้ `*`)
-- [ ] ตั้ง reverse proxy + HTTPS (Caddy/nginx — ดูตัวอย่างด้านล่าง)
-- [ ] Backup SQLite: `bash scripts/backup-db.sh` (cron รายวัน)
-- [ ] Backup volume `app-data`
+- [ ] ตั้ง reverse proxy + HTTPS (Caddy/nginx)
+- [ ] Backup DB: `bash scripts/backup-db.sh` (cron รายวัน)
 - [ ] ข้อมูล Yahoo Finance ไม่เหมาะสำหรับ trading แบบ real-time
-
-### Backup
-
-```bash
-bash scripts/backup-db.sh
-# ไฟล์อยู่ที่ backups/app_YYYYMMDD_HHMMSS.db
-```
-
-### HTTPS ตัวอย่าง (Caddy)
-
-```text
-your-domain.com {
-  reverse_proxy localhost:3010
-}
-```
-
----
-
----
-
-## Phase 3 — Portfolio & Watchlist
-
-### พอร์ต (`/portfolio`)
-- บันทึก **symbol + shares + avg_cost**
-- P/L unrealized อัปเดต auto **30s**
-- หน้าหุ้นแสดง banner ถ้าถืออยู่ + ส่งข้อมูลเข้า Trading Plan
-
-### Watchlist (แบบ C)
-| แหล่ง | ใครตั้ง | ใช้เมื่อ |
-|-------|---------|---------|
-| Global | Super Admin ที่ `/admin` | Market Signals → "Watchlist ทั่วไป" |
-| Personal | ⭐ รายการโปรดของ user | Market Signals → "รายการโปรด" |
-| Fallback | Global | ถ้า user ไม่มีโปรด |
-
----
-
-## Phase 4 — Tests
-
-```bash
-bash scripts/test-all.sh
-# หรือแยก:
-cd frontend && npm test
-docker compose exec backend sh -c 'pip install -q pytest httpx && cd /app && PYTHONPATH=. pytest tests/ -q'
-```
-
-| ชุด | ไฟล์ | ครอบคลุม |
-|-----|------|----------|
-| Backend | `tests/test_analysis.py` | RSI, S/R, recommendation |
-| Backend | `tests/test_positions.py` | CRUD + auth |
-| Backend | `tests/test_watchlist.py` | admin/user permissions |
-| Backend | `tests/test_market_signals.py` | scope global/personal |
-| Frontend | `src/utils/chartIndicators.test.js` | EMA, RSI, MACD, trend |
 
 ---
 
@@ -445,7 +503,19 @@ docker compose exec backend sh -c 'pip install -q pytest httpx && cd /app && PYT
 
 ```bash
 bash scripts/test-all.sh
+# หรือแยก:
+cd frontend && npm test
+docker compose exec backend sh -c 'pip install -q -r requirements-dev.txt && cd /app && PYTHONPATH=. pytest tests/ -q'
 ```
+
+| ชุด | ไฟล์ | ครอบคลุม |
+|-----|------|----------|
+| Backend | `tests/test_auth.py` | register, duplicate email/username |
+| Backend | `tests/test_analysis.py` | RSI, S/R, recommendation |
+| Backend | `tests/test_positions.py` | CRUD + auth |
+| Backend | `tests/test_watchlist.py` | admin/user permissions |
+| Backend | `tests/test_market_signals.py` | scope global/personal |
+| Frontend | `src/utils/chartIndicators.test.js` | EMA, RSI, MACD, trend |
 
 ---
 

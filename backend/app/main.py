@@ -9,7 +9,7 @@ from .init_db import init_db
 from .auth import get_current_user
 from .database import get_db
 from .models import User
-from .routers import auth, users, favorites, positions, watchlist
+from .routers import auth, users, favorites, positions, watchlist, price_alerts
 from sqlalchemy.orm import Session
 from .schemas import (
     StockQuote, StockHistoryResponse, StockInfo, CSVImportRequest, CSVExportRequest,
@@ -48,6 +48,7 @@ app.include_router(users.router)
 app.include_router(favorites.router)
 app.include_router(positions.router)
 app.include_router(watchlist.router)
+app.include_router(price_alerts.router)
 
 protected = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -113,6 +114,13 @@ def _run_analysis(
 @app.get("/")
 def read_root():
     return {"status": "online", "message": "Stock Analyzer API v2.1", "data_source": "Yahoo Finance (yfinance)"}
+
+
+@app.get("/api/config/public")
+def public_config():
+    """ค่า public สำหรับ frontend — ไม่ต้อง login"""
+    bmc = os.getenv("BMC_URL", "").strip() or os.getenv("VITE_BMC_URL", "").strip()
+    return {"bmc_url": bmc}
 
 
 @protected.get("/api/stock/quote", response_model=StockQuote)

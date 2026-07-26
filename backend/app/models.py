@@ -20,6 +20,7 @@ class User(Base):
 
     favorites: Mapped[list["Favorite"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     positions: Mapped[list["Position"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    price_alerts: Mapped[list["PriceAlert"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Favorite(Base):
@@ -56,3 +57,18 @@ class WatchlistItem(Base):
     symbol: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class PriceAlert(Base):
+    __tablename__ = "price_alerts"
+    __table_args__ = (UniqueConstraint("user_id", "symbol", "direction", "target_price", name="uq_user_alert"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    symbol: Mapped[str] = mapped_column(String(32), index=True)
+    target_price: Mapped[float] = mapped_column(Float)
+    direction: Mapped[str] = mapped_column(String(8))  # above | below
+    triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    user: Mapped["User"] = relationship(back_populates="price_alerts")

@@ -28,13 +28,19 @@ export function AuthProvider({ children }) {
     return res.user;
   };
 
+  const register = async (username, email, password) => {
+    const res = await api.register(username, email, password);
+    setUser(res.user);
+    return res.user;
+  };
+
   const logout = async () => {
     await api.logout();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refresh, isSuperAdmin: user?.role === 'superadmin' }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refresh, isSuperAdmin: user?.role === 'superadmin' }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Briefcase, Plus, Trash2, Loader2, AlertTriangle, TrendingUp, TrendingDown, Pencil,
+  Briefcase, Plus, Trash2, Loader2, AlertTriangle, TrendingUp, TrendingDown, Pencil, BellRing,
 } from 'lucide-react';
 import { api } from '../api';
 import { useQuotePoll } from '../hooks/useQuotePoll';
+import { usePriceAlerts } from '../hooks/usePriceAlerts';
+import PortfolioDashboard from '../components/PortfolioDashboard';
+import PriceAlertButton, { AlertTriggeredBadge } from '../components/PriceAlertButton';
 
 export default function PortfolioPage() {
   const [positions, setPositions] = useState([]);
@@ -30,6 +33,7 @@ export default function PortfolioPage() {
 
   useEffect(() => { load(); }, [load]);
   useQuotePoll(load, { enabled: true });
+  const { alerts, load: reloadAlerts, triggered } = usePriceAlerts();
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -98,19 +102,38 @@ export default function PortfolioPage() {
       )}
 
       {positions.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <SummaryCard label="มูลค่ารวม" value={totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} />
-          <SummaryCard label="ต้นทุนรวม" value={totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })} />
-          <SummaryCard
-            label="กำไร/ขาดทุน"
-            value={`${totalPnl >= 0 ? '+' : ''}${totalPnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-            positive={totalPnl >= 0}
-          />
-          <SummaryCard
-            label="% P/L"
-            value={`${totalPnlPct >= 0 ? '+' : ''}${totalPnlPct.toFixed(2)}%`}
-            positive={totalPnlPct >= 0}
-          />
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <SummaryCard label="มูลค่ารวม" value={totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} />
+            <SummaryCard label="ต้นทุนรวม" value={totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })} />
+            <SummaryCard
+              label="กำไร/ขาดทุน"
+              value={`${totalPnl >= 0 ? '+' : ''}${totalPnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+              positive={totalPnl >= 0}
+            />
+            <SummaryCard
+              label="% P/L"
+              value={`${totalPnlPct >= 0 ? '+' : ''}${totalPnlPct.toFixed(2)}%`}
+              positive={totalPnlPct >= 0}
+            />
+          </div>
+          <PortfolioDashboard positions={positions} totalValue={totalValue} />
+        </>
+      )}
+
+      {triggered.length > 0 && (
+        <div className="glass-card rounded-2xl p-4 border border-warning/30 bg-warning/5">
+          <p className="text-sm font-bold text-warning flex items-center gap-2 mb-2">
+            <BellRing size={16} /> แจ้งเตือนราคา ({triggered.length})
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {triggered.map((a) => (
+              <Link key={a.id} to={`/stock/${a.symbol}`} className="text-xs px-3 py-1.5 rounded-lg bg-warning/10 border border-warning/25 hover:border-warning/50">
+                <span className="font-mono font-bold">{a.symbol}</span>
+                <span className="text-muted ml-1">{a.direction === 'above' ? '≥' : '≤'} {a.target_price}</span>
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 
@@ -164,6 +187,7 @@ export default function PortfolioPage() {
                       <>
                         <td className="py-3 px-4">
                           <Link to={`/stock/${p.symbol}`} className="font-mono font-bold hover:text-primary">{p.symbol}</Link>
+                          <AlertTriggeredBadge show={alerts.some((a) => a.symbol === p.symbol && a.triggered)} />
                         </td>
                         <td className="py-3 px-4 text-right font-mono">{p.shares}</td>
                         <td className="py-3 px-4 text-right font-mono">{p.avg_cost?.toFixed(2)}</td>
@@ -179,6 +203,13 @@ export default function PortfolioPage() {
                           ) : '-'}
                         </td>
                         <td className="py-3 px-4 text-right space-x-2">
+                          <PriceAlertButton
+                            symbol={p.symbol}
+                            currentPrice={p.current_price}
+                            alerts={alerts}
+                            onChange={reloadAlerts}
+                            compact
+                          />
                           <button type="button" onClick={() => { setEditId(p.id); setEditForm({ shares: String(p.shares), avg_cost: String(p.avg_cost) }); }} className="text-xs text-primary hover:underline inline-flex items-center gap-1">
                             <Pencil size={12} /> แก้
                           </button>

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Activity, LogIn, AlertTriangle, Sparkles } from 'lucide-react';
+import { LogIn, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { BrandLockup } from '../components/BrandLogo';
+import SupportButton from '../components/SupportButton';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -35,16 +37,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-transparent text-foreground flex items-center justify-center p-4 relative">
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-3 group">
-            <div className="bg-gradient-primary p-3 rounded-xl text-white shadow-lg">
-              <Activity size={24} />
-            </div>
-            <div className="text-left">
-              <h1 className="text-xl font-black">
-                <span className="text-gradient">Stock</span> Analyzer
-              </h1>
-              <p className="text-[10px] text-muted uppercase tracking-widest">Global Markets</p>
-            </div>
+          <Link to="/" className="inline-block group">
+            <BrandLockup iconSize={44} className="justify-center group-hover:scale-[1.02] transition-transform duration-300" />
           </Link>
         </div>
 
@@ -54,7 +48,7 @@ export default function LoginPage() {
               <LogIn size={20} className="text-primary" />
               เข้าสู่ระบบ
             </h2>
-            <p className="text-xs text-muted mt-1">ใช้อีเมลและรหัสผ่านที่ได้รับจาก Admin</p>
+            <p className="text-xs text-muted mt-1">เข้าสู่ระบบด้วยอีเมลและรหัสผ่าน</p>
           </div>
 
           {error && (
@@ -98,12 +92,23 @@ export default function LoginPage() {
           >
             {loading ? 'กำลังเข้าสู่ระบบ...' : (
               <>
-                <Sparkles size={16} />
+                <LogIn size={16} />
                 เข้าสู่ระบบ
               </>
             )}
           </button>
+
+          <p className="text-center text-xs text-muted">
+            ยังไม่มีบัญชี?{' '}
+            <Link to="/register" state={location.state} className="text-primary hover:underline">
+              สมัครสมาชิก
+            </Link>
+          </p>
         </form>
+
+        <div className="mt-6 flex justify-center">
+          <SupportButton />
+        </div>
       </div>
     </div>
   );

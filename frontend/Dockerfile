@@ -3,6 +3,9 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
+ARG VITE_BMC_URL=
+ENV VITE_BMC_URL=$VITE_BMC_URL
+
 COPY package*.json ./
 
 RUN npm install

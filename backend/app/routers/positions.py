@@ -7,7 +7,7 @@ from ..database import get_db
 from ..models import User, Position
 from ..auth import get_current_user
 from ..auth_schemas import PositionOut, PositionCreate, PositionUpdate, PositionWithQuote
-from ..services import get_stock_quote
+from ..services import get_stock_quote, get_raw_financials
 
 router = APIRouter(prefix="/api/positions", tags=["positions"])
 
@@ -22,6 +22,7 @@ def list_positions(user: User = Depends(get_current_user), db: Session = Depends
     result = []
     for p in positions:
         quote = get_stock_quote(p.symbol)
+        raw = get_raw_financials(p.symbol)
         current = quote.price if quote else None
         cost_basis = p.shares * p.avg_cost
         market_value = p.shares * current if current else None
@@ -36,6 +37,8 @@ def list_positions(user: User = Depends(get_current_user), db: Session = Depends
             updated_at=p.updated_at,
             current_price=current,
             currency=quote.currency if quote else "USD",
+            name=raw.name,
+            sector=raw.sector,
             market_value=round(market_value, 2) if market_value is not None else None,
             cost_basis=round(cost_basis, 2),
             unrealized_pnl=round(pnl, 2) if pnl is not None else None,

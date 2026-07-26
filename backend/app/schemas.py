@@ -27,12 +27,19 @@ class StockHistoryResponse(BaseModel):
     interval: str
     history: List[StockHistoryItem]
 
+class DividendItem(BaseModel):
+    ex_date: str
+    amount: float
+
+
 class StockInfo(BaseModel):
     symbol: str
     name: Optional[str] = None
     summary: Optional[str] = None
     industry: Optional[str] = None
     sector: Optional[str] = None
+    dividends: List[DividendItem] = []
+    annual_dividend: Optional[float] = None
     pe_ratio: Optional[float] = None
     forward_pe: Optional[float] = None
     peg_ratio: Optional[float] = None

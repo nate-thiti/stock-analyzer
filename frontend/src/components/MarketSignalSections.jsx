@@ -4,6 +4,7 @@ import { TrendingUp, Activity, TrendingDown, Loader2, RefreshCw, ArrowUpRight, A
 import { api, ACTION_STYLES } from '../api';
 import { useQuotePoll, SIGNALS_POLL_MS } from '../hooks/useQuotePoll';
 import StarButton from './StarButton';
+import SegmentedControl from './SegmentedControl';
 
 const SECTIONS = [
   { key: 'buy', title: 'ควรซื้อเป็นอย่างยิ่ง', icon: TrendingUp, color: 'text-success', border: 'border-success/25', bg: 'bg-success/5' },
@@ -76,22 +77,14 @@ export default function MarketSignalSections() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex rounded-lg border border-border overflow-hidden text-[11px]">
-            <button
-              type="button"
-              onClick={() => setScope('global')}
-              className={`px-3 py-1.5 flex items-center gap-1 ${scope === 'global' ? 'bg-primary/15 text-primary' : 'text-muted hover:bg-surface'}`}
-            >
-              <Globe size={12} /> Watchlist ทั่วไป
-            </button>
-            <button
-              type="button"
-              onClick={() => setScope('personal')}
-              className={`px-3 py-1.5 flex items-center gap-1 ${scope === 'personal' ? 'bg-primary/15 text-primary' : 'text-muted hover:bg-surface'}`}
-            >
-              <Star size={12} /> รายการโปรด
-            </button>
-          </div>
+          <SegmentedControl
+            value={scope}
+            onChange={setScope}
+            options={[
+              { value: 'global', label: 'Watchlist ทั่วไป', icon: Globe },
+              { value: 'personal', label: 'รายการโปรด', icon: Star },
+            ]}
+          />
           <p className="text-[11px] text-muted">
             สแกน {data?.scanned} ตัว
             {data?.updated_at && <span> • อัปเดต {formatUpdated(data.updated_at)}</span>}

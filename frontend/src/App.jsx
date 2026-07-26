@@ -7,6 +7,7 @@ import HomePage from './pages/HomePage';
 import StockPage from './pages/StockPage';
 import ComparePage from './pages/ComparePage';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import AdminPage from './pages/AdminPage';
 import FavoritesPage from './pages/FavoritesPage';
 import PortfolioPage from './pages/PortfolioPage';
@@ -25,6 +26,7 @@ export default function App() {
       </Suspense>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>
           <Route index element={<ErrorBoundary><HomePage /></ErrorBoundary>} />
