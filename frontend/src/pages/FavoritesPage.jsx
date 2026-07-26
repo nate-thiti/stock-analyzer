@@ -67,12 +67,12 @@ function FavoriteCard({ symbol, alerts, onAlertChange }) {
   const isUp = quote?.change >= 0;
 
   return (
-    <Link to={`/stock/${symbol}`} className="glass-card rounded-2xl p-5 hover:border-primary/50 transition-all group relative">
-      <div className="absolute top-4 right-4 flex items-center gap-1">
+    <div className="glass-card rounded-2xl p-5 hover:border-primary/50 transition-all group relative">
+      <div className="absolute top-4 right-4 flex items-center gap-1 z-10">
         <PriceAlertButton symbol={symbol} currentPrice={quote?.price} alerts={alerts} onChange={onAlertChange} compact />
         <button
           type="button"
-          onClick={(e) => { e.preventDefault(); toggle(symbol); }}
+          onClick={() => toggle(symbol)}
           className="p-1.5 rounded-lg hover:bg-warning/10 transition-colors"
           aria-label="เอาดาวออก"
         >
@@ -80,21 +80,23 @@ function FavoriteCard({ symbol, alerts, onAlertChange }) {
         </button>
       </div>
 
-      <p className="font-mono font-black text-xl text-foreground">{symbol}</p>
-      {hasTriggered && <div className="mt-1"><AlertTriggeredBadge show /></div>}
-      {quote?.name && <p className="text-xs text-muted truncate mt-0.5">{quote.name}</p>}
+      <Link to={`/stock/${symbol}`} className="block">
+        <p className="font-mono font-black text-xl text-foreground pr-20">{symbol}</p>
+        {hasTriggered && <div className="mt-1"><AlertTriggeredBadge show /></div>}
+        {quote?.name && <p className="text-xs text-muted truncate mt-0.5">{quote.name}</p>}
 
-      {quote ? (
-        <>
-          <p className="text-2xl font-black mt-3">{quote.price?.toLocaleString()}</p>
-          <span className={`text-xs font-bold flex items-center gap-0.5 mt-1 ${isUp ? 'text-success' : 'text-danger'}`}>
-            {isUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-            {quote.change_percent?.toFixed(2)}%
-          </span>
-        </>
-      ) : (
-        <p className="text-sm text-muted mt-3">กำลังโหลด...</p>
-      )}
-    </Link>
+        {quote ? (
+          <>
+            <p className="text-2xl font-black mt-3">{quote.price?.toLocaleString()}</p>
+            <span className={`text-xs font-bold flex items-center gap-0.5 mt-1 ${isUp ? 'text-success' : 'text-danger'}`}>
+              {isUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+              {quote.change_percent?.toFixed(2)}%
+            </span>
+          </>
+        ) : (
+          <p className="text-sm text-muted mt-3">กำลังโหลด...</p>
+        )}
+      </Link>
+    </div>
   );
 }

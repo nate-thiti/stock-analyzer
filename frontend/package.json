@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/generate-redirects.mjs && vite build",
     "lint": "oxlint",
     "test": "node --test src/utils/chartIndicators.test.js",
     "preview": "vite preview"

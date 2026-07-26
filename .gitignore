@@ -2,6 +2,7 @@ data/
 backend/data/
 backups/
 .env
+frontend/public/_redirects
 *.pyc
 .venv/
 venv/

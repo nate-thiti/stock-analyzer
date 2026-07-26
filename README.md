@@ -442,7 +442,62 @@ total_score = fundamental × 0.45 + technical × 0.55
 
 ---
 
-## Production Deploy
+## Deploy แยก Frontend + Backend
+
+### ควรแยก git ไหม?
+
+**ไม่จำเป็น** — monorepo ใช้ได้ดี:
+
+| | Monorepo (แนะนำ) | แยก 2 repo |
+|---|------------------|------------|
+| Deploy | Netlify base=`frontend`, Render root=`backend` | แต่ละ repo deploy เอง |
+| แชร์ code/docs | ง่าย | ยาก |
+| CI/CD | 1 repo, 2 pipeline | 2 pipeline แยก |
+| เหมาะเมื่อ | โปรเจกต์เดียว / ทีมเล็ก | ทีมแยก, release คนละรอบ, open-source เฉพาะ frontend |
+
+โครงสร้างปัจจุบันแยกโฟลเดอร์อยู่แล้ว — **ไม่ต้องย้าย git**
+
+```
+stock-analyzer/          ← repo เดียว
+├── frontend/            → Netlify (static)
+├── backend/             → Render / Railway / VPS
+└── docker-compose.yml   → dev ในเครื่อง (ทั้งคู่)
+```
+
+### Architecture (production)
+
+```
+User → Netlify (React static)
+         └─ /api/* proxy → Backend (FastAPI :8010)
+                              └─ Neon Postgres
+```
+
+- Frontend เรียก `/api` same-origin → Netlify proxy ไป backend (cookie login ใช้ได้)
+- ตั้ง `BACKEND_URL` บน Netlify (ดู `frontend/DEPLOY.md`)
+- Backend ตั้ง `CORS_ORIGINS=https://your-app.netlify.app` (ดู `backend/DEPLOY.md`)
+
+### Quick start
+
+**1. Backend (Render + Neon)**
+
+```bash
+# render.com → New Blueprint → เลือก repo
+# ใส่ DATABASE_URL, CORS_ORIGINS, SUPERADMIN_*
+# ได้ URL เช่น https://stock-analyzer-api.onrender.com
+```
+
+**2. Frontend (Netlify)**
+
+```bash
+# netlify.com → Import Git → Base directory: frontend
+# Env: BACKEND_URL=https://stock-analyzer-api.onrender.com
+```
+
+รายละเอียด: [`frontend/DEPLOY.md`](frontend/DEPLOY.md) · [`backend/DEPLOY.md`](backend/DEPLOY.md)
+
+---
+
+## Production Deploy (Docker รวม — VPS)
 
 ### 1. ตั้งค่า environment
 

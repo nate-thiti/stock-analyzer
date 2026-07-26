@@ -45,7 +45,11 @@ export default function PriceAlertButton({ symbol, currentPrice, alerts = [], on
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(true);
+        }}
         className={`relative inline-flex items-center gap-1 rounded-lg transition-colors ${
           compact
             ? 'p-1.5 hover:bg-primary/10 text-muted hover:text-primary'

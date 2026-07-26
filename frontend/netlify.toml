@@ -1,0 +1,9 @@
+# Netlify — ตั้ง Base directory = frontend ใน Site settings
+# ตั้ง env BACKEND_URL = https://your-api.onrender.com (ไม่มี /api ท้าย)
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
