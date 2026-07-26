@@ -4,6 +4,7 @@ import ValuationMetricBars from './ValuationMetricBars';
 import QuarterlyFundamentalsChart from './QuarterlyFundamentalsChart';
 import PeHistoryChart from './PeHistoryChart';
 import TradingPlanPanel from '../TradingPlanPanel';
+import PriceRangeGrid from '../PriceRangeGrid';
 import InfoTip from '../InfoTip';
 import { GLOSSARY } from '../../utils/glossary';
 import { Loader2 } from 'lucide-react';
@@ -30,6 +31,9 @@ export default function ValuationPanel({
   currency,
   planLoading,
   position,
+  currentPrice,
+  priceRange,
+  rangeLabel,
 }) {
   if (!fundamental) return null;
 
@@ -46,15 +50,22 @@ export default function ValuationPanel({
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 xl:gap-8 items-start">
         {/* Charts — ซ้าย ใหญ่ */}
         <div className="space-y-8 min-w-0 order-last xl:order-none">
-          <div className="grid grid-cols-1 md:grid-cols-[200px_minmax(0,1fr)] gap-6 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-[160px_minmax(0,1fr)] gap-4 items-start">
             <ValuationScoreRing
               grade={fundamental.valuation_grade}
               pe={fundamental.pe_ratio}
               peg={fundamental.peg_ratio}
             />
-            <div>
-              <p className="text-[10px] text-muted font-bold uppercase mb-3 text-center md:text-left">Radar Profile</p>
+            <div className="min-w-0">
+              <p className="text-[10px] text-muted font-bold uppercase mb-2 text-center md:text-left">Radar Profile</p>
               <ValuationRadar fundamental={fundamental} large />
+              <PriceRangeGrid
+                low={priceRange?.low}
+                high={priceRange?.high}
+                current={currentPrice}
+                currency={currency}
+                rangeLabel={rangeLabel}
+              />
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowUpRight, ArrowDownRight, AlertTriangle, Building2,
@@ -13,7 +13,9 @@ import StockChart from '../components/StockChart';
 import ValuationPanel from '../components/valuation/ValuationPanel';
 import PriceAlertButton from '../components/PriceAlertButton';
 import DividendPanel from '../components/DividendPanel';
+import PriceRangeGrid from '../components/PriceRangeGrid';
 import SelectField from '../components/SelectField';
+import { computeHistoryPriceRange, formatChartRangeLabel } from '../utils/chartPriceRange';
 
 function ChangeBadge({ change, changePercent, currency, size = 'md' }) {
   const up = (change ?? 0) >= 0;
@@ -173,6 +175,11 @@ export default function StockPage() {
   }, [symbol, period, candleInterval]);
 
   const currency = quote?.currency || analysis?.currency || 'USD';
+  const chartPriceRange = useMemo(() => computeHistoryPriceRange(history), [history]);
+  const chartRangeLabel = useMemo(
+    () => formatChartRangeLabel(period, candleInterval),
+    [period, candleInterval],
+  );
   const marketUpdate = quote
     ? formatMarketTime(quote.market_time, quote.exchange_timezone, quote.market_state)
     : null;
@@ -320,6 +327,17 @@ export default function StockPage() {
                   options={[['1d', 'รายวัน'], ['1wk', 'รายสัปดาห์'], ['1h', '1 ชม.'], ['15m', '15 นาที']]}
                 />
               </div>
+
+              {chartPriceRange && (
+                <PriceRangeGrid
+                  low={chartPriceRange.low}
+                  high={chartPriceRange.high}
+                  current={quote?.price}
+                  currency={currency}
+                  rangeLabel={chartRangeLabel}
+                  compact
+                />
+              )}
             </div>
 
             {chartLoading ? (
@@ -392,6 +410,9 @@ export default function StockPage() {
           currency={currency}
           planLoading={analysisLoading}
           position={position}
+          currentPrice={quote?.price ?? analysis.current_price}
+          priceRange={chartPriceRange}
+          rangeLabel={chartRangeLabel}
         />
       )}
     </div>

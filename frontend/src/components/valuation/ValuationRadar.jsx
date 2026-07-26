@@ -35,7 +35,7 @@ export default function ValuationRadar({ fundamental, large = false }) {
 
   const cx = 120;
   const cy = 120;
-  const maxR = large ? 92 : 78;
+  const maxR = large ? 68 : 78;
   const n = AXES.length;
 
   const angles = AXES.map((_, i) => (Math.PI * 2 * i) / n - Math.PI / 2);
@@ -52,7 +52,7 @@ export default function ValuationRadar({ fundamental, large = false }) {
     <div className="w-full">
       <svg
         viewBox="0 0 240 240"
-        className={`w-full mx-auto ${large ? 'max-w-[420px] min-h-[280px]' : 'max-w-[280px]'}`}
+        className={`w-full mx-auto ${large ? 'max-w-[220px] min-h-[180px]' : 'max-w-[280px]'}`}
       >
         {gridLevels.map((level) => (
           <polygon
@@ -86,7 +86,7 @@ export default function ValuationRadar({ fundamental, large = false }) {
         ))}
 
         {AXES.map((axis, i) => {
-          const labelPt = point(angles[i], maxR + 18, cx, cy);
+          const labelPt = point(angles[i], maxR + (large ? 14 : 18), cx, cy);
           return (
             <text
               key={axis.key}
@@ -95,7 +95,7 @@ export default function ValuationRadar({ fundamental, large = false }) {
               textAnchor="middle"
               dominantBaseline="middle"
               fill="var(--muted)"
-              fontSize="12"
+              fontSize={large ? '10' : '12'}
               fontWeight="600"
             >
               {axis.label}
