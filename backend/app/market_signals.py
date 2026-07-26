@@ -17,7 +17,7 @@ from .risk import generate_recommendation
 from .models import WatchlistItem, Favorite
 from .init_db import DEFAULT_WATCHLIST
 
-CACHE_TTL = 900  # 15 นาที
+CACHE_TTL = 60  # 1 นาที
 _cache: Dict[str, object] = {"expires": 0.0, "payload": None, "key": ""}
 
 

@@ -12,9 +12,9 @@
 - **Market Signals** — สแกน watchlist แยกกลุ่ม ซื้อ / ถือ / ขาย
   - **Watchlist ทั่วไป** (admin ตั้งได้) หรือ **รายการโปรด** ของ user
   - ถ้าไม่มีรายการโปรด → fallback เป็น watchlist ทั่วไป
-  - Auto-refresh ทุก **15 นาที**
+  - Auto-refresh ทุก **1 นาที** — กดปุ่มรีเฟรชเพื่อบังคับสแกนใหม่
 - **เปรียบเทียบด่วน** — preset 23 หมวด
-- ราคาอัปเดตอัตโนมัติทุก **3 นาที**
+- ราคาการ์ด / ดูล่าสุด อัปเดตอัตโนมัติทุก **1 นาที**
 
 ### หน้าหุ้น (`/stock/:symbol`)
 - ราคา, ข้อมูลบริษัท, กราฟแท่งเทียน (Lightweight Charts)
@@ -24,7 +24,7 @@
 - **เงินปันผล** — ประวัติงวด, ประมาณการ/ปี, Div Yield
 - **Trading Plan** — คำแนะนำซื้อ/ถือ/ขาย, stop loss, target, position sizing, DCA
 - สลับโหมด **"ถืออยู่แล้ว" / "ยังไม่ได้ซื้อ"** สำหรับคำแนะนำที่ต่างกัน
-- ราคาอัปเดตอัตโนมัติทุก **30 วินาที**, กราฟทุก **5 นาที**, วิเคราะห์ทุก **5 นาที**
+- ราคา / กราฟ / วิเคราะห์ refresh ทุก **1 นาที**
 - แสดง **เวลาซื้อขายล่าสุด** (จาก Yahoo) และ **เวลาที่ดึงข้อมูล** (`fetched_at`) แยกกัน
 - ปุ่ม ⭐ เพิ่มรายการโปรด, **Price Alert** ตั้งแจ้งเตือนเมื่อราคาถึงเป้า
 - Banner แสดงถ้าถือหุ้นในพอร์ต
@@ -34,21 +34,36 @@
 - แสดงมูลค่าปัจจุบัน, กำไร/ขาดทุน unrealized (%)
 - **Dashboard** — pie chart สัดส่วนตามหุ้น, bar chart ตาม sector, การ์ดกำไร/ขาดทุนสูงสุด
 - **Price Alert** ต่อหุ้น + แบนเนอร์แจ้งเตือนที่ trigger แล้ว
-- แก้ไข / ลบรายการ — ราคาอัปเดต auto **30s**
+- แก้ไข / ลบรายการ — ราคาอัปเดต auto ทุก **1 นาที**
 
 ### เปรียบเทียบ (`/compare`)
 - เลือก 2–5 หุ้น เปรียบ side-by-side
 - Preset 23 หมวด — กด preset เปลี่ยน **เพิ่มด่วน** (ไม่ auto compare)
 - ปุ่ม **+ เลือกหุ้นจาก preset** และ **แชร์ลิงก์** (copy URL)
 - สรุป Best Pick, กราฟ valuation เปรียบเทียบ, ตารางละเอียดแบบ collapsible
+- **ไม่ auto-refresh** — โหลดใหม่เมื่อกดเปรียบเทียบ
 
 ### รายการโปรด (`/favorites`)
-- หุ้นที่บันทึกไว้ พร้อมราคาอัปเดตอัตโนมัติทุก 30 วินาที
-- **Price Alert** ต่อหุ้น + badge เมื่อถึงราคาเป้า
+- หุ้นที่บันทึกไว้ พร้อมราคาอัปเดตอัตโนมัติทุก **1 นาที**
+- **Price Alert** ต่อหุ้น (ปุ่ม 🔔 บนการ์ด)
+
+### แจ้งเตือนราคา (`/alerts`)
+- หน้าจัดการ alert ทั้งหมด — สรุป ทั้งหมด / กำลังเฝ้า / ถึงเป้าแล้ว
+- ฟอร์มตั้ง alert ใหม่, filter ตาราง, ลบได้
+- ตรวจราคา auto ทุก **1 นาที** — badge กระดิ่งใน header เมื่อ trigger
+- ตั้งได้จาก: หน้าหุ้น, พอร์ต, รายการโปรด, หน้า `/alerts`
+
+### คู่มือการใช้งาน (`/guide`)
+- สอนทีละขั้น พร้อมภาพ mock UI — responsive ทุกขนาดจอ
+- สารบัญ jump ไปแต่ละหมวด: เริ่มต้น, หน้าแรก, หน้าหุ้น, พอร์ต, ติดดาว, แจ้งเตือน, เปรียบเทียบ, Tips
+- ลิงก์จากเมนู **คู่มือ** และ footer
 
 ### ระบบผู้ใช้
 - **สมัครสมาชิก** (`/register`) — username + email + password (ไม่ใช้ OAuth)
 - **Login** (`/login`) ด้วย JWT (HttpOnly cookie)
+- หน้า login/register — layout แบ่งครึ่งบน desktop (ฟอร์มซ้าย + **3D candlestick animation** ขวา, โทนม่วง)
+- มือถือ — ฟอร์มเต็มหน้า (ไม่แสดง 3D)
+- ปุ่ม **เปิด/ปิดรหัสผ่าน** (ไอคอนตา) ในช่อง password
 - สมัคร/ล็อกอินแล้วเข้าใช้งานทันที (auto session)
 - **Super Admin** — จัดการผู้ใช้ + **Watchlist ทั่วไป** ที่ `/admin`
 - **Neon Postgres** (แนะนำ) หรือ SQLite — เก็บ users, favorites, positions, watchlist, price_alerts
@@ -56,16 +71,33 @@
 
 ### Price Alerts
 - ตั้งเงื่อนไข **ราคา ≥ เป้า** หรือ **ราคา ≤ เป้า**
-- ตรวจอัตโนมัติทุก **30 วินาที** — แสดง badge เมื่อ trigger
-- ตั้งได้จากหน้าหุ้น, พอร์ต, รายการโปรด (modal กลางจอ)
+- ตรวจอัตโนมัติทุก **1 นาที** — แสดง badge เมื่อ trigger
+- ไม่ส่ง push/email — ต้องเปิดเว็บเพื่อดู
 
 ### UI / UX
-- Dark/Light theme
-- พื้นหลัง 3D (Three.js) แบบ full-screen
+- Dark/Light theme (toggle มุมขวาบน — รวมหน้า login/register)
+- พื้นหลัง 3D (Three.js) แบบ full-screen หลังแอปหลัก
 - Logo + favicon แบบ candlestick (SVG)
 - Custom **SelectField** dropdown และ **SegmentedControl** ทั้งระบบ
-- Responsive + เมนู hamburger บนมือถือ
-- ปุ่ม **Ko-fi / สนับสนุน** ใน header, เมนูมือถือ, หน้า login/register
+- Responsive — เมนู hamburger จนถึงจอ **xl**, ไอคอน-only จนถึง **2xl**
+- ปุ่ม **Ko-fi / สนับสนุน** ใน **topnav เท่านั้น** (desktop + mobile header)
+
+---
+
+## Routes
+
+| Path | ต้อง login | คำอธิบาย |
+|------|------------|----------|
+| `/login` | ไม่ | เข้าสู่ระบบ |
+| `/register` | ไม่ | สมัครสมาชิก |
+| `/` | ใช่ | หน้าแรก |
+| `/stock/:symbol` | ใช่ | วิเคราะห์หุ้น |
+| `/portfolio` | ใช่ | พอร์ตของฉัน |
+| `/favorites` | ใช่ | หุ้นติดดาว |
+| `/alerts` | ใช่ | จัดการ Price Alerts |
+| `/compare` | ใช่ | เปรียบเทียบหุ้น |
+| `/guide` | ใช่ | คู่มือการใช้งาน |
+| `/admin` | superadmin | จัดการผู้ใช้ & watchlist |
 
 ---
 
@@ -73,14 +105,17 @@
 
 | ชั้น | เทคโนโลยี |
 |------|-----------|
-| Backend | Python 3.10, FastAPI, Uvicorn, yfinance, pandas, SQLAlchemy, **PostgreSQL (Neon)** / SQLite |
+| Backend | Python 3.10+, FastAPI, Uvicorn, yfinance, pandas, SQLAlchemy, **PostgreSQL (Neon)** / SQLite, **psycopg3** |
 | Frontend | React 19, Vite 8, Tailwind CSS 4, React Router 7 |
 | Charts | Lightweight Charts (TradingView), Three.js |
-| Deploy | Docker Compose — nginx (frontend `:3010`) → FastAPI (`:8010`) |
+| Deploy (dev) | Docker Compose — nginx (frontend `:3010`) → FastAPI (`:8010`) |
+| Deploy (prod) | **Netlify** (frontend) + **Render** (backend) + **Neon** (DB) |
 
 ```
-Browser → nginx :3010 → /api/* → FastAPI :8010 → yfinance / Neon Postgres
-                                              └→ SQLite (dev fallback)
+Browser → Netlify (React static)
+            └─ /api/* proxy → Render (FastAPI :8010) → Neon Postgres
+
+Dev: Browser → nginx :3010 → /api/* → FastAPI :8010 → Neon / SQLite
 ```
 
 ---
@@ -101,6 +136,8 @@ stock-analyzer/
 │   └── test-all.sh
 ├── backend/
 │   ├── Dockerfile
+│   ├── render.yaml
+│   ├── DEPLOY.md
 │   ├── requirements.txt
 │   ├── requirements-dev.txt
 │   ├── tests/
@@ -113,11 +150,11 @@ stock-analyzer/
 │       ├── valuation_charts.py
 │       ├── market_signals.py
 │       ├── auth.py
-│       ├── database.py
+│       ├── database.py          # normalize postgresql:// → psycopg3
 │       ├── models.py
 │       ├── init_db.py
 │       └── routers/
-│           ├── auth.py
+│           ├── auth.py          # login, register, logout, me
 │           ├── users.py
 │           ├── favorites.py
 │           ├── positions.py
@@ -126,6 +163,9 @@ stock-analyzer/
 └── frontend/
     ├── Dockerfile
     ├── nginx.conf
+    ├── netlify.toml
+    ├── DEPLOY.md
+    ├── scripts/generate-redirects.mjs
     ├── public/
     │   └── favicon.svg
     └── src/
@@ -142,11 +182,20 @@ stock-analyzer/
         │   └── glossary.js
         ├── context/
         ├── pages/
+        │   ├── HomePage.jsx
+        │   ├── StockPage.jsx
+        │   ├── ComparePage.jsx
+        │   ├── PortfolioPage.jsx
+        │   ├── FavoritesPage.jsx
+        │   ├── AlertsPage.jsx
+        │   ├── GuidePage.jsx
         │   ├── LoginPage.jsx
-        │   └── RegisterPage.jsx
+        │   ├── RegisterPage.jsx
+        │   └── AdminPage.jsx
         └── components/
             ├── Layout.jsx
             ├── BrandLogo.jsx
+            ├── AnimatedBackground.jsx
             ├── StockChart.jsx
             ├── TradingPlanPanel.jsx
             ├── MarketSignalSections.jsx
@@ -154,10 +203,13 @@ stock-analyzer/
             ├── PriceAlertButton.jsx
             ├── RecentStocksSection.jsx
             ├── DividendPanel.jsx
-            ├── SelectField.jsx
-            ├── SegmentedControl.jsx
+            ├── PasswordInput.jsx
             ├── SupportButton.jsx
-            ├── Modal.jsx
+            ├── auth/
+            │   ├── AuthPageLayout.jsx
+            │   └── AuthScene3D.jsx
+            ├── guide/
+            │   └── GuideMockups.jsx
             └── valuation/
 ```
 
@@ -243,6 +295,9 @@ npm run dev
 | `SUPERADMIN_EMAIL` | `admin@example.com` | อีเมล superadmin |
 | `SUPERADMIN_PASSWORD` | `admin1234` | รหัสผ่าน superadmin |
 | `DATABASE_URL` | `sqlite:////data/app.db` | **Neon Postgres** (`postgresql+psycopg://...?sslmode=require`) หรือ SQLite |
+| `BMC_URL` | — | ลิงก์สนับสนุน (Ko-fi / Buy Me a Coffee) — แสดงปุ่มใน topnav |
+| `BACKEND_URL` | — | (Netlify) URL backend สำหรับ proxy `/api/*` |
+| `VITE_BMC_URL` | — | (optional) ลิงก์สนับสนุนตอน build frontend — ถ้าไม่ตั้งจะอ่านจาก API |
 
 ### ตั้ง Neon Postgres
 
@@ -256,9 +311,8 @@ DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST/neondb?sslmode=require
 
 4. Restart backend — `init_db()` สร้างตาราง + seed superadmin/watchlist อัตโนมัติ
 
+> Render อาจส่ง `postgresql://` — backend แปลงเป็น `postgresql+psycopg://` อัตโนมัติ  
 > อย่า commit `.env` — เก็บ credentials ใน env เท่านั้น
-| `BMC_URL` | — | ลิงก์สนับสนุน (Ko-fi / Buy Me a Coffee) — แสดงปุ่มใน UI |
-| `VITE_BMC_URL` | — | (optional) ลิงก์สนับสนุนตอน build frontend — ถ้าไม่ตั้งจะอ่านจาก API |
 
 ### ตั้งลิงก์ Ko-fi / Buy Me a Coffee
 
@@ -352,31 +406,31 @@ docker compose up -d   # restart backend — ไม่ต้อง rebuild front
 
 ## การอัปเดตข้อมูล & Cache
 
-### Frontend (auto-poll)
+### Frontend (auto-poll — ทุก **1 นาที**)
 
-| หน้า | สิ่งที่ refresh | ช่วงเวลา |
-|------|-----------------|----------|
-| StockPage | ราคา | 30 วินาที |
-| StockPage | กราฟราคา | 5 นาที |
-| StockPage | วิเคราะห์ | 5 นาที |
-| FavoritesPage | ราคา | 30 วินาที |
-| PortfolioPage | ราคา + P/L | 30 วินาที |
-| Price Alerts | ตรวจ trigger | 30 วินาที |
-| HomePage Market Signals | สัญญาณ | 15 นาที |
-| HomePage | การ์ดราคา / ดูล่าสุด | 3 นาที |
+| หน้า / ฟีเจอร์ | สิ่งที่ refresh |
+|----------------|-----------------|
+| StockPage | ราคา, กราฟ, วิเคราะห์ |
+| HomePage | การ์ดราคา, ดูล่าสุด, Market Signals |
+| FavoritesPage | ราคา |
+| PortfolioPage | ราคา + P/L |
+| Price Alerts | ตรวจ trigger |
+| ComparePage | ไม่ auto — โหลดเมื่อกดเปรียบเทียบ |
 
 - กลับมาแท็บเบราว์เซอร์ → ดึงข้อมูลทันที
 - `market_time` = เวลาซื้อขายล่าสุดจาก Yahoo (อาจไม่เปลี่ยนเมื่อตลาดปิด)
 - `fetched_at` = เวลาที่ backend ดึงจาก Yahoo ล่าสุด
 
-### Backend cache
+### Backend cache (TTL **1 นาที**)
 
 | ประเภท | TTL |
 |--------|-----|
-| Quote | 30 วินาที |
-| History | 5 นาที |
-| Raw financials | 30 นาที |
-| Market signals | 15 นาที |
+| Quote | 1 นาที |
+| History | 1 นาที |
+| Raw financials | 1 นาที |
+| Market signals | 1 นาที |
+
+> ข้อมูล Yahoo ต้นทางอาจดีเลย์ 5–15 นาที — refresh บ่อยขึ้นไม่ได้ทำให้ real-time
 
 ### ดูล่าสุด (localStorage)
 
@@ -453,9 +507,7 @@ total_score = fundamental × 0.45 + technical × 0.55
 | Deploy | Netlify base=`frontend`, Render root=`backend` | แต่ละ repo deploy เอง |
 | แชร์ code/docs | ง่าย | ยาก |
 | CI/CD | 1 repo, 2 pipeline | 2 pipeline แยก |
-| เหมาะเมื่อ | โปรเจกต์เดียว / ทีมเล็ก | ทีมแยก, release คนละรอบ, open-source เฉพาะ frontend |
-
-โครงสร้างปัจจุบันแยกโฟลเดอร์อยู่แล้ว — **ไม่ต้องย้าย git**
+| เหมาะเมื่อ | โปรเจกต์เดียว / ทีมเล็ก | ทีมแยก, release คนละรอบ |
 
 ```
 stock-analyzer/          ← repo เดียว
@@ -468,13 +520,14 @@ stock-analyzer/          ← repo เดียว
 
 ```
 User → Netlify (React static)
-         └─ /api/* proxy → Backend (FastAPI :8010)
+         └─ /api/* proxy → Backend (FastAPI)
                               └─ Neon Postgres
 ```
 
 - Frontend เรียก `/api` same-origin → Netlify proxy ไป backend (cookie login ใช้ได้)
-- ตั้ง `BACKEND_URL` บน Netlify (ดู `frontend/DEPLOY.md`)
-- Backend ตั้ง `CORS_ORIGINS=https://your-app.netlify.app` (ดู `backend/DEPLOY.md`)
+- ตั้ง `BACKEND_URL` บน Netlify (ดู [`frontend/DEPLOY.md`](frontend/DEPLOY.md))
+- Backend ตั้ง `CORS_ORIGINS=https://your-app.netlify.app` (ดู [`backend/DEPLOY.md`](backend/DEPLOY.md))
+- Render: ตั้ง **Root Directory = `backend`**
 
 ### Quick start
 
@@ -482,7 +535,8 @@ User → Netlify (React static)
 
 ```bash
 # render.com → New Blueprint → เลือก repo
-# ใส่ DATABASE_URL, CORS_ORIGINS, SUPERADMIN_*
+# Root Directory: backend
+# ใส่ DATABASE_URL, CORS_ORIGINS, JWT_SECRET, SUPERADMIN_*, APP_ENV=production
 # ได้ URL เช่น https://stock-analyzer-api.onrender.com
 ```
 
@@ -531,7 +585,7 @@ bash scripts/backup-db.sh          # Postgres → pg_dump / SQLite → copy .db
 # cron รายวัน — ดู deploy/cron-backup.example
 ```
 
-> ใช้ Neon แล้ว — backup ผ่าน `pg_dump` (ต้องมี `postgresql-client` บน host) หรือใช้ Neon built-in backup
+> ใช้ Neon แล้ว — backup ผ่าน `pg_dump` หรือใช้ Neon built-in backup
 
 ### Dev vs Production
 
@@ -548,7 +602,7 @@ bash scripts/backup-db.sh          # Postgres → pg_dump / SQLite → copy .db
 - [ ] เปลี่ยน `JWT_SECRET` เป็นค่าสุ่มยาว (≥ 32 ตัวอักษร)
 - [ ] เปลี่ยน `SUPERADMIN_PASSWORD` ทันทีหลัง first login
 - [ ] ตั้ง `CORS_ORIGINS` เป็นโดเมนจริง (ไม่ใช้ `*`)
-- [ ] ตั้ง reverse proxy + HTTPS (Caddy/nginx)
+- [ ] ตั้ง reverse proxy + HTTPS (Caddy/nginx) หรือ Netlify + Render
 - [ ] Backup DB: `bash scripts/backup-db.sh` (cron รายวัน)
 - [ ] ข้อมูล Yahoo Finance ไม่เหมาะสำหรับ trading แบบ real-time
 

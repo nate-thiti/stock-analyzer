@@ -197,7 +197,7 @@ export default function ComparePage() {
   const validResults = data?.results?.filter((r) => r.recommendation !== 'error') || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0">
       <div>
         <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
           <GitCompare size={24} className="text-primary" />
@@ -266,14 +266,14 @@ export default function ComparePage() {
           )}
         </form>
 
-        <div className="flex flex-wrap gap-2">
-          <span className="text-[10px] text-muted self-center mr-1 w-full sm:w-auto">Preset:</span>
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-0.5 px-0.5 sm:flex-wrap sm:overflow-visible">
+          <span className="text-[10px] text-muted self-center mr-1 shrink-0">Preset:</span>
           {PRESETS.map((preset) => (
             <button
               key={preset.label}
               type="button"
               onClick={() => previewPreset(preset)}
-              className={`px-3 py-1.5 border rounded-lg text-[11px] font-medium transition-colors ${
+              className={`px-3 py-1.5 border rounded-lg text-[11px] font-medium transition-colors shrink-0 whitespace-nowrap ${
                 activePreset === preset.label
                   ? 'bg-primary/10 border-primary text-primary'
                   : 'bg-surface border-border text-muted hover:border-primary hover:text-primary'
@@ -289,7 +289,7 @@ export default function ComparePage() {
                 const p = PRESETS.find((x) => x.label === activePreset);
                 if (p) addAllFromPreset(p);
               }}
-              className="px-3 py-1.5 border border-primary/40 rounded-lg text-[11px] font-medium text-primary bg-primary/5 hover:bg-primary/10"
+              className="px-3 py-1.5 border border-primary/40 rounded-lg text-[11px] font-medium text-primary bg-primary/5 hover:bg-primary/10 shrink-0 whitespace-nowrap"
             >
               + เลือกหุ้นจาก {activePreset}
             </button>

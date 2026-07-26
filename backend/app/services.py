@@ -8,9 +8,9 @@ from typing import Dict, Any, Optional, List
 from .schemas import StockQuote, StockHistoryItem, StockInfo
 from .fundamentals import RawFinancials, compute_fundamentals
 
-QUOTE_CACHE_EXPIRY = 30
-HISTORY_CACHE_EXPIRY = 300
-RAW_CACHE_EXPIRY = 1800
+QUOTE_CACHE_EXPIRY = 60
+HISTORY_CACHE_EXPIRY = 60
+RAW_CACHE_EXPIRY = 60
 
 quote_cache: Dict[str, Dict[str, Any]] = {}
 raw_cache: Dict[str, Dict[str, Any]] = {}

@@ -77,6 +77,15 @@ html {
   font-size: 16px;
   background-color: var(--bg);
   transition: background-color 0.4s ease, color 0.4s ease;
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+}
+
+#root {
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 #modal-root {
@@ -86,13 +95,35 @@ html {
 
 body {
   margin: 0;
+  min-height: 100dvh;
   background-color: transparent;
   color: var(--foreground);
   font-family: 'Inter', 'Sarabun', system-ui, -apple-system, sans-serif;
   font-size: 1rem;
   line-height: 1.5;
-  overflow-x: hidden;
+  overflow-x: clip;
   transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+/* ป้องกัน flex/grid child ดันหลุดจอ */
+img, svg, video, canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* hover lift เฉพาะจอที่มีเมาส์ — มือถือไม่ดัน layout */
+@media (hover: hover) and (pointer: fine) {
+  .glass-card:hover {
+    border-color: var(--border-glow);
+    box-shadow: var(--shadow-card), 0 0 24px var(--primary-glow);
+    transform: translateY(-2px);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .glass-card:hover {
+    transform: none;
+  }
 }
 
 /* ── Native select fallback (ถ้ามีในอนาคต) ── */
@@ -242,12 +273,9 @@ select.select-native:disabled {
   backdrop-filter: blur(20px) saturate(160%);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
-  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.glass-card:hover {
-  border-color: var(--border-glow);
-  box-shadow: var(--shadow-card), 0 0 24px var(--primary-glow);
-  transform: translateY(-2px);
+  transition: border-color 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── Buttons ── */

@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 
-const POLL_MS = 30_000;
-const HOME_POLL_MS = 180_000;
-const SIGNALS_POLL_MS = 900_000;
-const ANALYSIS_POLL_MS = 300_000;
+const POLL_MS = 60_000;
+const HOME_POLL_MS = 60_000;
+const SIGNALS_POLL_MS = 60_000;
+const ANALYSIS_POLL_MS = 60_000;
 
 export function useQuotePoll(fetchQuote, { enabled = true, intervalMs = POLL_MS } = {}) {
   const fetchRef = useRef(fetchQuote);

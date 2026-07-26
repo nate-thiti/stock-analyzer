@@ -99,7 +99,7 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0">
       <div>
         <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
           <Shield size={24} className="text-primary" />

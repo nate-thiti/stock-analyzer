@@ -19,7 +19,7 @@ export function usePriceAlerts({ enabled = true, poll = true } = {}) {
   }, [enabled]);
 
   useEffect(() => { load(); }, [load]);
-  useQuotePoll(load, { enabled: enabled && poll, intervalMs: 30_000 });
+  useQuotePoll(load, { enabled: enabled && poll });
 
   const triggered = alerts.filter((a) => a.triggered);
   const bySymbol = (symbol) => alerts.filter((a) => a.symbol === symbol.toUpperCase());

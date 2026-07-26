@@ -85,7 +85,7 @@ export default function PortfolioPage() {
   const totalPnlPct = totalCost ? (totalPnl / totalCost) * 100 : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0">
       <div>
         <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
           <Briefcase size={24} className="text-primary" />
@@ -122,19 +122,22 @@ export default function PortfolioPage() {
       )}
 
       {triggered.length > 0 && (
-        <div className="glass-card rounded-2xl p-4 border border-warning/30 bg-warning/5">
+        <Link
+          to="/alerts"
+          className="block glass-card rounded-2xl p-4 border border-warning/30 bg-warning/5 hover:border-warning/50 transition-colors"
+        >
           <p className="text-sm font-bold text-warning flex items-center gap-2 mb-2">
-            <BellRing size={16} /> แจ้งเตือนราคา ({triggered.length})
+            <BellRing size={16} /> แจ้งเตือนราคา ({triggered.length}) — ดูทั้งหมด
           </p>
           <div className="flex flex-wrap gap-2">
             {triggered.map((a) => (
-              <Link key={a.id} to={`/stock/${a.symbol}`} className="text-xs px-3 py-1.5 rounded-lg bg-warning/10 border border-warning/25 hover:border-warning/50">
+              <span key={a.id} className="text-xs px-3 py-1.5 rounded-lg bg-warning/10 border border-warning/25">
                 <span className="font-mono font-bold">{a.symbol}</span>
                 <span className="text-muted ml-1">{a.direction === 'above' ? '≥' : '≤'} {a.target_price}</span>
-              </Link>
+              </span>
             ))}
           </div>
-        </div>
+        </Link>
       )}
 
       <form onSubmit={handleCreate} className="glass-card rounded-2xl p-5 space-y-4">

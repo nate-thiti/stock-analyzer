@@ -2,16 +2,18 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import {
   BarChart3, GitCompare, Home, Star, Shield,
-  LogOut, User, Menu, X, Briefcase,
+  LogOut, User, Menu, X, Briefcase, Bell, BellRing, BookOpen,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import SupportButton from './SupportButton';
 import { BrandLockup } from './BrandLogo';
 import { useAuth } from '../context/AuthContext';
+import { usePriceAlerts } from '../hooks/usePriceAlerts';
 
 export default function Layout() {
   const { pathname } = useLocation();
   const { user, logout, isSuperAdmin } = useAuth();
+  const { triggered } = usePriceAlerts();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -19,7 +21,9 @@ export default function Layout() {
     { to: '/', label: 'หน้าแรก', icon: Home },
     { to: '/portfolio', label: 'พอร์ต', icon: Briefcase },
     { to: '/favorites', label: 'ติดดาว', icon: Star },
+    { to: '/alerts', label: 'แจ้งเตือน', icon: Bell },
     { to: '/compare', label: 'เปรียบเทียบ', icon: GitCompare },
+    { to: '/guide', label: 'คู่มือ', icon: BookOpen },
   ];
 
   const adminLink = isSuperAdmin
@@ -56,44 +60,65 @@ export default function Layout() {
     }`;
 
   return (
-    <div className="min-h-screen bg-transparent text-foreground font-sans antialiased relative">
+    <div className="min-h-dvh w-full max-w-[100vw] overflow-x-clip bg-transparent text-foreground font-sans antialiased relative flex flex-col">
       <header
-        className="sticky top-0 z-50 border-b border-border backdrop-blur-xl transition-all duration-400"
+        className="sticky top-0 z-50 border-b border-border backdrop-blur-xl transition-all duration-400 shrink-0"
         style={{ background: 'var(--header-bg)' }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-          <Link to="/" className="shrink-0 min-w-0 group">
+        <div className="max-w-7xl mx-auto w-full min-w-0 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-3">
+          <Link to="/" className="shrink-0 min-w-0 max-w-[55%] sm:max-w-none group">
             <BrandLockup
-              iconSize={36}
+              iconSize={32}
               className="group-hover:scale-[1.02] transition-transform duration-300"
             />
           </Link>
 
-          {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-2 lg:gap-3 shrink-0">
-            <nav className="flex items-center gap-1">
+          {/* Desktop nav — xl+ เพื่อไม่ให้เมนูเบียดบน tablet */}
+          <div className="hidden xl:flex items-center gap-1.5 2xl:gap-2 shrink-0 min-w-0">
+            <nav className="flex items-center gap-0.5 2xl:gap-1 min-w-0">
               {nav.map(({ to, label, icon: Icon }) => (
                 <Link
                   key={to}
                   to={to}
-                  className={navLinkClass(pathname === to, 'text-xs px-3 py-2')}
+                  className={navLinkClass(pathname === to, 'text-xs px-2 2xl:px-3 py-2 whitespace-nowrap')}
                 >
                   <Icon size={14} className="icon-animate shrink-0" />
-                  <span>{label}</span>
+                  <span className="hidden 2xl:inline">{label}</span>
                 </Link>
               ))}
               {adminLink && (
-                <Link to={adminLink.to} className={adminLinkClass(pathname === adminLink.to, 'text-xs px-3 py-2')}>
+                <Link to={adminLink.to} className={adminLinkClass(pathname === adminLink.to, 'text-xs px-2 2xl:px-3 py-2 whitespace-nowrap')}>
                   <adminLink.icon size={14} />
-                  <span>{adminLink.label}</span>
+                  <span className="hidden 2xl:inline">{adminLink.label}</span>
                 </Link>
               )}
             </nav>
 
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface/60 border border-border/40 text-[10px] text-muted">
-              <User size={12} />
-              {user?.username}
+            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-surface/60 border border-border/40 text-[10px] text-muted max-w-[100px] 2xl:max-w-[140px]">
+              <User size={12} className="shrink-0" />
+              <span className="truncate">{user?.username}</span>
             </div>
+
+            <Link
+              to="/alerts"
+              className={`relative p-2 rounded-xl transition-colors ${
+                pathname === '/alerts'
+                  ? 'text-warning bg-warning/10 border border-warning/30'
+                  : 'text-muted hover:text-warning hover:bg-warning/10 border border-transparent'
+              }`}
+              title="แจ้งเตือนราคา"
+            >
+              {triggered.length > 0 ? (
+                <BellRing size={16} className="animate-pulse" />
+              ) : (
+                <Bell size={16} />
+              )}
+              {triggered.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-warning text-[9px] font-bold text-background flex items-center justify-center">
+                  {triggered.length > 9 ? '9+' : triggered.length}
+                </span>
+              )}
+            </Link>
 
             <button
               type="button"
@@ -107,8 +132,24 @@ export default function Layout() {
             <ThemeToggle />
           </div>
 
-          {/* Mobile: support + theme + hamburger */}
-          <div className="flex md:hidden items-center gap-2 shrink-0">
+          {/* Mobile / tablet */}
+          <div className="flex xl:hidden items-center gap-1.5 sm:gap-2 shrink-0">
+            <Link
+              to="/alerts"
+              className={`relative p-2 rounded-xl border transition-colors ${
+                pathname === '/alerts'
+                  ? 'border-warning/40 bg-warning/10 text-warning'
+                  : 'border-border/60 bg-surface/60 text-muted hover:text-warning'
+              }`}
+              aria-label="แจ้งเตือนราคา"
+            >
+              {triggered.length > 0 ? <BellRing size={18} className="animate-pulse" /> : <Bell size={18} />}
+              {triggered.length > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 px-0.5 rounded-full bg-warning text-[8px] font-bold text-background flex items-center justify-center">
+                  {triggered.length > 9 ? '9+' : triggered.length}
+                </span>
+              )}
+            </Link>
             <SupportButton compact />
             <ThemeToggle />
             <button
@@ -126,7 +167,7 @@ export default function Layout() {
 
       {/* Mobile menu overlay */}
       {menuOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="fixed inset-0 z-40 xl:hidden">
           <button
             type="button"
             className="absolute inset-0 bg-background/60 backdrop-blur-sm"
@@ -166,8 +207,6 @@ export default function Layout() {
               )}
             </div>
 
-            <SupportButton className="w-full justify-center mt-2" />
-
             <button
               type="button"
               onClick={handleLogout}
@@ -180,13 +219,14 @@ export default function Layout() {
         </div>
       )}
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 page-enter relative z-10">
+      <main className="flex-1 w-full min-w-0 max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 page-enter relative z-10">
         <Outlet />
       </main>
 
-      <footer className="relative z-10 border-t border-border/40 py-4 text-center text-[10px] text-muted backdrop-blur-sm px-4">
+      <footer className="relative z-10 shrink-0 border-t border-border/40 py-3 sm:py-4 text-center text-[10px] text-muted backdrop-blur-sm px-3 sm:px-4 leading-relaxed">
         <BarChart3 size={12} className="inline mr-1 text-primary" />
-        ข้อมูลจาก Yahoo Finance • คำนวณ P/E, PEG, P/S โดยระบบ • ใช้เพื่อการศึกษา
+        ข้อมูลจาก Yahoo Finance • ใช้เพื่อการศึกษา •{' '}
+        <Link to="/guide" className="text-primary hover:underline">คู่มือการใช้งาน</Link>
       </footer>
     </div>
   );

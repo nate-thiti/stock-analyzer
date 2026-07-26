@@ -74,18 +74,20 @@ export default function MarketSignalSections() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
+    <div className="space-y-6 w-full min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0 w-full">
           <SegmentedControl
             value={scope}
             onChange={setScope}
+            fullWidth
+            className="w-full sm:w-auto sm:max-w-md"
             options={[
               { value: 'global', label: 'Watchlist ทั่วไป', icon: Globe },
               { value: 'personal', label: 'รายการโปรด', icon: Star },
             ]}
           />
-          <p className="text-[11px] text-muted">
+          <p className="text-[11px] text-muted shrink-0">
             สแกน {data?.scanned} ตัว
             {data?.updated_at && <span> • อัปเดต {formatUpdated(data.updated_at)}</span>}
             <span className="text-primary/70 ml-1">• auto 15m</span>

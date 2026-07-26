@@ -34,7 +34,7 @@ export default function ValuationPanel({
   if (!fundamental) return null;
 
   return (
-    <div className="glass-card rounded-2xl p-6 lg:p-8 animate-fadeIn">
+    <div className="glass-card rounded-2xl p-4 sm:p-6 lg:p-8 animate-fadeIn min-w-0">
       <div className="flex items-center justify-between gap-4 mb-6 pb-4 border-b border-border/40">
         <h3 className="text-base font-bold text-foreground flex items-center gap-2">
           <span className="w-1.5 h-5 bg-gradient-primary rounded-full" />

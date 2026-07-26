@@ -12,7 +12,7 @@ export default function FavoritesPage() {
   const { alerts, load: reloadAlerts, triggered } = usePriceAlerts();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0">
       <div>
         <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
           <Star size={24} className="text-warning fill-warning" />
@@ -22,9 +22,12 @@ export default function FavoritesPage() {
       </div>
 
       {triggered.length > 0 && (
-        <div className="glass-card rounded-xl p-3 border border-warning/30 bg-warning/5 text-xs text-warning">
-          มี {triggered.length} alert ถึงราคาเป้าแล้ว — ดูที่การ์ดหุ้นด้านล่าง
-        </div>
+        <Link
+          to="/alerts"
+          className="block glass-card rounded-xl p-3 border border-warning/30 bg-warning/5 text-xs text-warning hover:border-warning/50 transition-colors"
+        >
+          มี {triggered.length} alert ถึงราคาเป้าแล้ว — ดู Notifications
+        </Link>
       )}
 
       {favLoading ? (

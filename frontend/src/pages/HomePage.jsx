@@ -36,12 +36,12 @@ export default function HomePage() {
   };
 
   return (
-    <div className="space-y-8">
-      <section className="text-center py-10 relative">
-        <h2 className="text-3xl sm:text-5xl font-black text-foreground mb-3 animate-fadeIn">
+    <div className="space-y-8 w-full min-w-0">
+      <section className="text-center py-6 sm:py-10 relative">
+        <h2 className="text-2xl sm:text-3xl lg:text-5xl font-black text-foreground mb-3 animate-fadeIn px-1">
           วิเคราะห์<span className="text-gradient">หุ้นทั่วโลก</span>
         </h2>
-        <p className="text-sm text-muted max-w-lg mx-auto mb-8">
+        <p className="text-sm text-muted max-w-lg mx-auto mb-8 px-2">
           คำนวณ P/E, PEG, P/S • วิเคราะห์ Technical • แนะนำซื้อ/ขาย • Stop Loss • แผนแบ่งซื้อ DCA
         </p>
 

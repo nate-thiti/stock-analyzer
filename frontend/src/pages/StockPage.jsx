@@ -65,7 +65,7 @@ export default function StockPage() {
     }
   }, [symbol, period, candleInterval]);
 
-  useQuotePoll(refreshHistory, { enabled: !!symbol, intervalMs: 300_000 });
+  useQuotePoll(refreshHistory, { enabled: !!symbol, intervalMs: ANALYSIS_POLL_MS });
 
   const refreshAnalysis = useCallback(async () => {
     if (!symbol) return;
@@ -152,7 +152,7 @@ export default function StockPage() {
     : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <Link to="/" className="text-xs text-muted hover:text-primary transition-colors">← หน้าแรก</Link>
         <Link
@@ -176,11 +176,11 @@ export default function StockPage() {
       {position && (
         <Link
           to="/portfolio"
-          className="glass-card rounded-xl px-4 py-3 flex items-center justify-between gap-3 border border-primary/25 bg-primary/5 hover:border-primary/40 transition-colors"
+          className="glass-card rounded-xl px-3 sm:px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border border-primary/25 bg-primary/5 hover:border-primary/40 transition-colors"
         >
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-2 text-sm min-w-0">
             <Briefcase size={16} className="text-primary shrink-0" />
-            <span>
+            <span className="truncate">
               ถืออยู่ <strong>{position.shares}</strong> หุ้น @ {position.avg_cost?.toFixed(2)}
             </span>
           </div>
@@ -194,14 +194,14 @@ export default function StockPage() {
       )}
 
       {/* กราฟราคา + ข้อมูลบริษัท */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-        <div className="lg:col-span-2 h-full">
-          <div className="glass-card rounded-2xl p-6 h-full">
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 items-stretch min-w-0">
+        <div className="lg:col-span-2 h-full min-w-0">
+          <div className="glass-card rounded-2xl p-4 sm:p-6 h-full min-w-0">
+            <div className="flex flex-col gap-4 mb-4 sm:mb-5">
               {quote ? (
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h2 className="text-2xl font-black text-foreground">{quote.symbol}</h2>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
+                    <h2 className="text-xl sm:text-2xl font-black text-foreground">{quote.symbol}</h2>
                     <StarButton symbol={quote.symbol} />
                     <PriceAlertButton
                       symbol={quote.symbol}
@@ -209,10 +209,12 @@ export default function StockPage() {
                       alerts={alerts}
                       onChange={reloadAlerts}
                     />
-                    <span className="text-sm text-muted">{quote.name}</span>
                   </div>
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-3xl font-black">{quote.price?.toLocaleString()}</span>
+                  {quote.name && (
+                    <p className="text-xs sm:text-sm text-muted truncate mb-2">{quote.name}</p>
+                  )}
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="text-2xl sm:text-3xl font-black">{quote.price?.toLocaleString()}</span>
                     <span className="text-xs text-muted uppercase">{currency}</span>
                     <span className={`flex items-center text-xs font-semibold px-2 py-1 rounded-lg border ${
                       quote.change >= 0 ? 'bg-success/5 border-success/20 text-success' : 'bg-danger/5 border-danger/20 text-danger'
@@ -251,12 +253,13 @@ export default function StockPage() {
                 <div className="h-16 flex items-center text-sm text-muted">กำลังโหลดราคา...</div>
               ) : null}
 
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
                 <SelectField
                   label="ช่วงเวลา"
                   value={period}
                   onChange={setPeriod}
                   size="sm"
+                  className="flex-1 sm:flex-none sm:min-w-[120px]"
                   options={[['1mo', '1 เดือน'], ['3mo', '3 เดือน'], ['6mo', '6 เดือน'], ['1y', '1 ปี'], ['5y', '5 ปี']]}
                 />
                 <SelectField
@@ -264,13 +267,14 @@ export default function StockPage() {
                   value={candleInterval}
                   onChange={setCandleInterval}
                   size="sm"
+                  className="flex-1 sm:flex-none sm:min-w-[120px]"
                   options={[['1d', 'รายวัน'], ['1wk', 'รายสัปดาห์'], ['1h', '1 ชม.'], ['15m', '15 นาที']]}
                 />
               </div>
             </div>
 
             {chartLoading ? (
-              <div className="h-[520px] sm:h-[760px] flex items-center justify-center">
+              <div className="h-[min(52vh,520px)] sm:h-[min(72vh,760px)] flex items-center justify-center">
                 <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : history.length > 0 ? (
@@ -286,13 +290,13 @@ export default function StockPage() {
                 )}
               </>
             ) : (
-              <div className="h-[520px] sm:h-[760px] flex items-center justify-center text-sm text-muted">ไม่มีข้อมูลกราฟ</div>
+              <div className="h-[min(52vh,520px)] sm:h-[min(72vh,760px)] flex items-center justify-center text-sm text-muted">ไม่มีข้อมูลกราฟ</div>
             )}
           </div>
         </div>
 
         {info && (
-          <div className="glass-card rounded-2xl p-5 h-full flex flex-col">
+          <div className="glass-card rounded-2xl p-4 sm:p-5 h-full flex flex-col min-w-0">
             <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2 shrink-0">
               <Building2 size={16} className="text-primary" /> ข้อมูลบริษัท
             </h3>
