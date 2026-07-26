@@ -15,22 +15,30 @@ import PriceAlertButton from '../components/PriceAlertButton';
 import DividendPanel from '../components/DividendPanel';
 import SelectField from '../components/SelectField';
 
-function ExtendedPriceLine({ label, price, change, changePercent, currency }) {
-  if (price == null) return null;
+function ChangeBadge({ change, changePercent, size = 'md' }) {
   const up = (change ?? 0) >= 0;
+  const compact = size === 'sm';
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mt-2 pt-2 border-t border-border/30">
-      <span className="text-[10px] font-bold uppercase text-warning/90 tracking-wide">{label}</span>
-      <span className="text-lg sm:text-xl font-bold text-foreground">{price.toLocaleString()}</span>
+    <span className={`inline-flex items-center font-semibold rounded-lg border ${
+      compact ? 'text-[10px] px-1.5 py-0.5 gap-0.5' : 'text-xs px-2 py-1 gap-0.5'
+    } ${up ? 'bg-success/5 border-success/20 text-success' : 'bg-danger/5 border-danger/20 text-danger'}`}>
+      {up ? <ArrowUpRight size={compact ? 11 : 14} /> : <ArrowDownRight size={compact ? 11 : 14} />}
+      {change >= 0 ? '+' : ''}{change?.toFixed(2)} ({changePercent?.toFixed(2)}%)
+    </span>
+  );
+}
+
+function ExtendedPriceInline({ label, price, change, changePercent, currency }) {
+  if (price == null) return null;
+  return (
+    <span className="inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+      <span className="text-[10px] font-bold uppercase text-warning/90 whitespace-nowrap">{label}</span>
+      <span className="text-sm sm:text-base font-bold text-foreground">{price.toLocaleString()}</span>
       <span className="text-[10px] text-muted uppercase">{currency}</span>
       {change != null && changePercent != null && (
-        <span className={`flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-md border ${
-          up ? 'bg-success/5 border-success/20 text-success' : 'bg-danger/5 border-danger/20 text-danger'
-        }`}>
-          {up ? '+' : ''}{change.toFixed(2)} ({changePercent.toFixed(2)}%)
-        </span>
+        <ChangeBadge change={change} changePercent={changePercent} size="sm" />
       )}
-    </div>
+    </span>
   );
 }
 
@@ -232,34 +240,33 @@ export default function StockPage() {
                   {quote.name && (
                     <p className="text-xs sm:text-sm text-muted truncate mb-2">{quote.name}</p>
                   )}
-                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <div className="flex flex-wrap items-baseline gap-x-2 sm:gap-x-3 gap-y-2">
                     <span className="text-2xl sm:text-3xl font-black">{quote.price?.toLocaleString()}</span>
                     <span className="text-xs text-muted uppercase">{currency}</span>
-                    <span className={`flex items-center text-xs font-semibold px-2 py-1 rounded-lg border ${
-                      quote.change >= 0 ? 'bg-success/5 border-success/20 text-success' : 'bg-danger/5 border-danger/20 text-danger'
-                    }`}>
-                      {quote.change >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                      {quote.change >= 0 ? '+' : ''}{quote.change?.toFixed(2)} ({quote.change_percent?.toFixed(2)}%)
-                    </span>
+                    <ChangeBadge change={quote.change} changePercent={quote.change_percent} />
+                    {(quote.pre_market_price != null || quote.post_market_price != null) && (
+                      <>
+                        <span className="hidden sm:inline text-border/80 text-sm leading-none select-none" aria-hidden="true">|</span>
+                        {quote.pre_market_price != null ? (
+                          <ExtendedPriceInline
+                            label="ก่อนตลาดเปิด"
+                            price={quote.pre_market_price}
+                            change={quote.pre_market_change}
+                            changePercent={quote.pre_market_change_percent}
+                            currency={currency}
+                          />
+                        ) : (
+                          <ExtendedPriceInline
+                            label="หลังตลาดปิด"
+                            price={quote.post_market_price}
+                            change={quote.post_market_change}
+                            changePercent={quote.post_market_change_percent}
+                            currency={currency}
+                          />
+                        )}
+                      </>
+                    )}
                   </div>
-                  {quote.pre_market_price != null && (
-                    <ExtendedPriceLine
-                      label="ก่อนตลาดเปิด"
-                      price={quote.pre_market_price}
-                      change={quote.pre_market_change}
-                      changePercent={quote.pre_market_change_percent}
-                      currency={currency}
-                    />
-                  )}
-                  {quote.post_market_price != null && (
-                    <ExtendedPriceLine
-                      label="หลังตลาดปิด"
-                      price={quote.post_market_price}
-                      change={quote.post_market_change}
-                      changePercent={quote.post_market_change_percent}
-                      currency={currency}
-                    />
-                  )}
                   {!quote.pre_market_price && !quote.post_market_price
                     && !quote.symbol.includes('.')
                     && ['CLOSED', 'PREPRE', 'POSTPOST'].includes(quote.market_state) && (
