@@ -68,17 +68,17 @@ export default function GuidePage() {
       </div>
 
       {/* TOC */}
-      <nav className="glass-card rounded-2xl p-4 sm:p-5 sticky top-[60px] z-20 lg:static">
+      <nav className="glass-card rounded-2xl p-4 sm:p-5 lg:sticky lg:top-[60px] lg:z-20">
         <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-3">สารบัญ</p>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {SECTIONS.map(({ id, label, icon: Icon }) => (
             <a
               key={id}
               href={`#${id}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-surface/60 border border-border/40 text-muted hover:text-primary hover:border-primary/30 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-medium bg-surface/60 border border-border/40 text-muted hover:text-primary hover:border-primary/30 transition-colors min-w-0"
             >
               <Icon size={12} className="shrink-0" />
-              {label}
+              <span className="truncate">{label}</span>
             </a>
           ))}
         </div>
