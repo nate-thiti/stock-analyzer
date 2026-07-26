@@ -10,7 +10,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { buildChartIndicators } from '../utils/chartIndicators';
 import InfoTip from './InfoTip';
-import { GLOSSARY } from '../data/glossary';
+import { GLOSSARY } from '../utils/glossary';
 
 const DAILY_INTERVALS = new Set(['1d', '1wk', '1mo']);
 const DESKTOP_HEIGHT = 720;

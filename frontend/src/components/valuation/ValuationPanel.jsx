@@ -5,7 +5,7 @@ import QuarterlyFundamentalsChart from './QuarterlyFundamentalsChart';
 import PeHistoryChart from './PeHistoryChart';
 import TradingPlanPanel from '../TradingPlanPanel';
 import InfoTip from '../InfoTip';
-import { GLOSSARY } from '../../data/glossary';
+import { GLOSSARY } from '../../utils/glossary';
 import { Loader2 } from 'lucide-react';
 
 function TrendBadge({ label, value }) {
