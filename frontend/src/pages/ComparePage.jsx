@@ -4,7 +4,7 @@ import {
   GitCompare, AlertTriangle, Trophy, ArrowRight, Search, X, Plus,
   Loader2, ChevronDown, ChevronUp, Sparkles, Link2, Check,
 } from 'lucide-react';
-import { api, ACTION_STYLES, GRADE_LABELS, POPULAR_STOCKS, COMPARE_PRESET_GROUPS, formatPct } from '../api';
+import { api, ACTION_STYLES, GRADE_LABELS, POPULAR_STOCKS, COMPARE_PRESET_GROUPS, formatPct, formatMoney } from '../api';
 import CompareValuationChart from '../components/valuation/CompareValuationChart';
 
 const MAX_STOCKS = 5;
@@ -23,7 +23,7 @@ const METRIC_GROUPS = [
   {
     title: 'ภาพรวม',
     rows: [
-      { label: 'ราคา', get: (r) => r.current_price?.toFixed(2) },
+      { label: 'ราคา', get: (r) => formatMoney(r.current_price, r.currency) },
       {
         label: 'คำแนะนำ',
         get: (r) => {
@@ -56,8 +56,8 @@ const METRIC_GROUPS = [
     title: 'เทคนิค & แผน',
     rows: [
       { label: 'Trend', get: (r) => r.trend?.trend_direction?.replace('_', ' ').toUpperCase() || '-' },
-      { label: 'Stop Loss', get: (r) => r.trading_plan?.stop_loss?.toFixed(2) || '-' },
-      { label: 'Target', get: (r) => r.trading_plan?.target_price?.toFixed(2) || '-' },
+      { label: 'Stop Loss', get: (r) => formatMoney(r.trading_plan?.stop_loss, r.currency) || '-' },
+      { label: 'Target', get: (r) => formatMoney(r.trading_plan?.target_price, r.currency) || '-' },
       { label: 'จำนวนหุ้น', get: (r) => r.trading_plan?.position_size_shares || '-' },
       { label: 'R:R', get: (r) => (r.trading_plan?.risk_reward_ratio ? `1:${r.trading_plan.risk_reward_ratio}` : '-') },
     ],
@@ -494,7 +494,7 @@ function CompareStockCard({ result: r, isBest }) {
 
       {r.trading_plan && (
         <p className="text-[10px] text-muted mt-2 font-mono">
-          SL {r.trading_plan.stop_loss?.toFixed(2)} → Target {r.trading_plan.target_price?.toFixed(2)}
+          SL {formatMoney(r.trading_plan.stop_loss, r.currency)} → Target {formatMoney(r.trading_plan.target_price, r.currency)}
         </p>
       )}
     </Link>

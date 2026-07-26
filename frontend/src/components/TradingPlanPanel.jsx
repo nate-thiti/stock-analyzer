@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Activity, Shield, Target, Wallet, Layers, Calendar, AlertCircle, Package, ShoppingCart } from 'lucide-react';
-import { ACTION_STYLES } from '../api';
+import { ACTION_STYLES, formatMoney, formatPnl } from '../api';
 import SegmentedControl from './SegmentedControl';
 
 const POSITION_MODES = {
@@ -193,13 +193,13 @@ export default function TradingPlanPanel({ plan, currency, embedded = false, pos
         <div className="mb-4 p-3 rounded-xl bg-primary/5 border border-primary/20 grid grid-cols-2 gap-2 text-xs">
           <div>
             <p className="text-[10px] text-muted uppercase">ถืออยู่จริง</p>
-            <p className="font-mono font-bold text-foreground">{position.shares} หุ้น @ {position.avg_cost?.toFixed(2)}</p>
+            <p className="font-mono font-bold text-foreground">{position.shares} หุ้น @ {formatMoney(position.avg_cost, currency)}</p>
           </div>
           <div className="text-right">
             <p className="text-[10px] text-muted uppercase">P/L</p>
             <p className={`font-mono font-bold ${(position.unrealized_pnl ?? 0) >= 0 ? 'text-success' : 'text-danger'}`}>
               {position.unrealized_pnl != null
-                ? `${position.unrealized_pnl >= 0 ? '+' : ''}${position.unrealized_pnl?.toFixed(0)} (${position.unrealized_pnl_pct?.toFixed(1)}%)`
+                ? formatPnl(position.unrealized_pnl, position.unrealized_pnl_pct, currency)
                 : '-'}
             </p>
           </div>
@@ -262,7 +262,7 @@ export default function TradingPlanPanel({ plan, currency, embedded = false, pos
                 </div>
                 {plan.action === 'buy' && s.shares > 0 && (
                   <div className="text-right shrink-0">
-                    <p className="font-mono font-bold text-foreground">{s.shares} หุ้น @ {s.price_target?.toFixed(2)}</p>
+                    <p className="font-mono font-bold text-foreground">{s.shares} หุ้น @ {formatMoney(s.price_target, currency)}</p>
                     <p className="text-muted">{s.amount?.toLocaleString()} {currency}</p>
                   </div>
                 )}

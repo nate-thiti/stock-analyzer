@@ -148,7 +148,10 @@ function StockCard({ symbol, name, market }) {
 
       <div className="flex items-end justify-between mt-2 gap-2">
         {quote ? (
-          <p className="text-sm font-mono font-bold text-foreground">{quote.price?.toLocaleString()}</p>
+          <p className="text-sm font-mono font-bold text-foreground">
+            {quote.price?.toLocaleString()}
+            <span className="text-[10px] text-muted font-normal ml-1">{quote.currency}</span>
+          </p>
         ) : (
           <span className="text-xs text-muted">...</span>
         )}

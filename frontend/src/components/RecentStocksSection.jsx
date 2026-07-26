@@ -63,7 +63,10 @@ function RecentChip({ symbol, onRemove }) {
         <p className="font-mono font-bold text-sm">{symbol}</p>
         {quote ? (
           <>
-            <p className="text-lg font-black mt-1">{quote.price?.toLocaleString()}</p>
+            <p className="text-lg font-black mt-1">
+              {quote.price?.toLocaleString()}
+              <span className="text-[10px] text-muted font-normal ml-1">{quote.currency}</span>
+            </p>
             <span className={`text-[10px] font-bold flex items-center gap-0.5 ${isUp ? 'text-success' : 'text-danger'}`}>
               {isUp ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
               {quote.change_percent?.toFixed(2)}%

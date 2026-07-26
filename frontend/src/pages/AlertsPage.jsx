@@ -4,7 +4,7 @@ import {
   Bell, BellRing, Loader2, Trash2, Plus, ArrowUpRight, ArrowDownRight,
   TrendingUp, TrendingDown, ExternalLink,
 } from 'lucide-react';
-import { api } from '../api';
+import { api, inferCurrency, formatMoney, formatSignedMoney } from '../api';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import SelectField from '../components/SelectField';
 import SegmentedControl from '../components/SegmentedControl';
@@ -213,6 +213,7 @@ function StatCard({ label, value, accent }) {
 }
 
 function NotificationRow({ alert: a, onDelete, deleting }) {
+  const cur = inferCurrency(a.symbol);
   const diff = a.current_price != null ? a.current_price - a.target_price : null;
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 bg-warning/10 border border-warning/25">
@@ -223,9 +224,9 @@ function NotificationRow({ alert: a, onDelete, deleting }) {
             {a.symbol}
           </Link>
           <p className="text-xs text-muted mt-0.5">
-            {directionLabel(a.direction)} {directionSymbol(a.direction)} {a.target_price.toLocaleString()}
+            {directionLabel(a.direction)} {directionSymbol(a.direction)} {formatMoney(a.target_price, cur)}
             {a.current_price != null && (
-              <span className="ml-2 font-mono text-warning">ตอนนี้ {a.current_price.toLocaleString()}</span>
+              <span className="ml-2 font-mono text-warning">ตอนนี้ {formatMoney(a.current_price, cur)}</span>
             )}
           </p>
         </div>
@@ -234,7 +235,7 @@ function NotificationRow({ alert: a, onDelete, deleting }) {
         {diff != null && (
           <span className={`text-xs font-bold flex items-center gap-0.5 ${diff >= 0 ? 'text-success' : 'text-danger'}`}>
             {diff >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-            {diff >= 0 ? '+' : ''}{diff.toFixed(2)}
+            {formatSignedMoney(diff, cur)}
           </span>
         )}
         <Link
@@ -258,6 +259,7 @@ function NotificationRow({ alert: a, onDelete, deleting }) {
 }
 
 function AlertRow({ alert: a, onDelete, deleting }) {
+  const cur = inferCurrency(a.symbol);
   const pctToTarget = a.current_price != null && a.target_price
     ? ((a.current_price - a.target_price) / a.target_price) * 100
     : null;
@@ -272,11 +274,11 @@ function AlertRow({ alert: a, onDelete, deleting }) {
       <td className="py-3 px-4">
         <span className="text-xs">{directionLabel(a.direction)}</span>
         <p className="font-mono font-bold mt-0.5">
-          {directionSymbol(a.direction)} {a.target_price.toLocaleString()}
+          {directionSymbol(a.direction)} {formatMoney(a.target_price, cur)}
         </p>
       </td>
       <td className="py-3 px-4 text-right font-mono">
-        {a.current_price != null ? a.current_price.toLocaleString() : '—'}
+        {a.current_price != null ? formatMoney(a.current_price, cur) : '—'}
         {pctToTarget != null && !a.triggered && (
           <p className={`text-[10px] mt-0.5 flex items-center justify-end gap-0.5 ${pctToTarget >= 0 ? 'text-success' : 'text-danger'}`}>
             {pctToTarget >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}

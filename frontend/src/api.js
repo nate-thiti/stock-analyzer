@@ -178,11 +178,56 @@ export function formatPct(val, decimals = 1) {
   return pct.toFixed(decimals) + '%';
 }
 
+export function inferCurrency(symbol, currency) {
+  if (currency) return currency;
+  const s = symbol?.toUpperCase() ?? '';
+  if (s.endsWith('.BK')) return 'THB';
+  if (s.endsWith('.HK')) return 'HKD';
+  return 'USD';
+}
+
+export function formatNumber(num, { decimals, compact = false } = {}) {
+  if (num == null || Number.isNaN(Number(num))) return null;
+  const n = Number(num);
+  if (compact) return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const d = decimals ?? 2;
+  return n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+export function formatMoney(num, currency, options = {}) {
+  const formatted = formatNumber(num, options);
+  if (formatted == null) return '-';
+  return currency ? `${formatted} ${currency}` : formatted;
+}
+
+export function formatSignedMoney(num, currency, options = {}) {
+  if (num == null || Number.isNaN(Number(num))) return '-';
+  const n = Number(num);
+  const formatted = formatNumber(n, options);
+  const signed = `${n >= 0 ? '+' : ''}${formatted}`;
+  return currency ? `${signed} ${currency}` : signed;
+}
+
+export function formatSignedPct(num, decimals = 2) {
+  if (num == null || Number.isNaN(Number(num))) return '-';
+  const n = Number(num);
+  return `${n >= 0 ? '+' : ''}${n.toFixed(decimals)}%`;
+}
+
+export function formatPnl(amount, pct, currency, { pctDecimals = 1 } = {}) {
+  if (amount == null) return '-';
+  const money = formatSignedMoney(amount, currency, { compact: true });
+  if (pct == null) return money;
+  return `${money} (${formatSignedPct(pct, pctDecimals)})`;
+}
+
+export const EXTENDED_HOURS_LABEL = 'ก่อนตลาดเปิด';
+
 const MARKET_STATE_LABELS = {
   REGULAR: 'ตลาดเปิด',
   CLOSED: 'ตลาดปิด',
-  PRE: 'ก่อนตลาดเปิด',
-  POST: 'หลังตลาดปิด',
+  PRE: EXTENDED_HOURS_LABEL,
+  POST: EXTENDED_HOURS_LABEL,
   PREPRE: 'ตลาดปิด',
   POSTPOST: 'ตลาดปิด',
 };

@@ -1,5 +1,5 @@
 import { Banknote } from 'lucide-react';
-import { formatPct } from '../api';
+import { formatPct, formatMoney } from '../api';
 
 function sortChronological(dividends) {
   return [...dividends].sort((a, b) => a.ex_date.localeCompare(b.ex_date));
@@ -170,7 +170,7 @@ export default function DividendPanel({ dividends = [], annualDividend, dividend
         {dividendYield != null && (
           <Stat label="Div Yield" value={formatPct(dividendYield)} />
         )}
-        <Stat label="งวดล่าสุด" value={latest ? `${latest.amount.toFixed(4)}` : '-'} />
+        <Stat label="งวดล่าสุด" value={latest ? formatMoney(latest.amount, currency, { decimals: 4 }) : '-'} />
       </div>
 
       {sorted.length > 0 && (

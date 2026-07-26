@@ -1,10 +1,10 @@
 import { useState, useId } from 'react';
 import { Bell, BellRing, Loader2 } from 'lucide-react';
-import { api } from '../api';
+import { api, inferCurrency, formatMoney } from '../api';
 import Modal from './Modal';
 import SelectField from './SelectField';
 
-export default function PriceAlertButton({ symbol, currentPrice, alerts = [], onChange, compact = false }) {
+export default function PriceAlertButton({ symbol, currentPrice, currency, alerts = [], onChange, compact = false }) {
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState('');
   const [direction, setDirection] = useState('above');
@@ -13,6 +13,7 @@ export default function PriceAlertButton({ symbol, currentPrice, alerts = [], on
   const titleId = useId();
 
   const sym = symbol?.toUpperCase();
+  const cur = inferCurrency(sym, currency);
   const symbolAlerts = alerts.filter((a) => a.symbol === sym);
   const hasTriggered = symbolAlerts.some((a) => a.triggered);
 
@@ -82,7 +83,7 @@ export default function PriceAlertButton({ symbol, currentPrice, alerts = [], on
         {currentPrice != null && (
           <p className="text-xs text-muted -mt-1">
             ราคาปัจจุบัน:{' '}
-            <span className="font-mono font-bold text-foreground">{currentPrice.toLocaleString()}</span>
+            <span className="font-mono font-bold text-foreground">{formatMoney(currentPrice, cur)}</span>
           </p>
         )}
 
@@ -129,7 +130,7 @@ export default function PriceAlertButton({ symbol, currentPrice, alerts = [], on
                 className={`flex items-center justify-between text-xs rounded-lg px-3 py-2 ${a.triggered ? 'bg-warning/10 border border-warning/30' : 'bg-surface/50'}`}
               >
                 <span>
-                  {a.direction === 'above' ? '≥' : '≤'} {a.target_price}
+                  {a.direction === 'above' ? '≥' : '≤'} {formatMoney(a.target_price, cur)}
                   {a.triggered && <span className="ml-2 text-warning font-bold">ถึงแล้ว!</span>}
                 </span>
                 <button type="button" onClick={() => handleDelete(a.id)} className="text-danger hover:underline">ลบ</button>

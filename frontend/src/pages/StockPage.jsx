@@ -4,7 +4,7 @@ import {
   ArrowUpRight, ArrowDownRight, AlertTriangle, Building2,
   GitCompare, Info, BarChart3, Percent, Coins, Layers, Loader2, Clock, Radio, Briefcase,
 } from 'lucide-react';
-import { api, formatHistoryDate, formatMarketCap, formatMarketTime, formatFetchedAt, formatPct } from '../api';
+import { api, formatHistoryDate, formatMarketCap, formatMarketTime, formatFetchedAt, formatPct, formatMoney, formatPnl, EXTENDED_HOURS_LABEL } from '../api';
 import { useQuotePoll, ANALYSIS_POLL_MS } from '../hooks/useQuotePoll';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import { addRecentStock } from '../utils/recentStocks';
@@ -15,7 +15,7 @@ import PriceAlertButton from '../components/PriceAlertButton';
 import DividendPanel from '../components/DividendPanel';
 import SelectField from '../components/SelectField';
 
-function ChangeBadge({ change, changePercent, size = 'md' }) {
+function ChangeBadge({ change, changePercent, currency, size = 'md' }) {
   const up = (change ?? 0) >= 0;
   const compact = size === 'sm';
   return (
@@ -23,7 +23,9 @@ function ChangeBadge({ change, changePercent, size = 'md' }) {
       compact ? 'text-[10px] px-1.5 py-0.5 gap-0.5' : 'text-xs px-2 py-1 gap-0.5'
     } ${up ? 'bg-success/5 border-success/20 text-success' : 'bg-danger/5 border-danger/20 text-danger'}`}>
       {up ? <ArrowUpRight size={compact ? 11 : 14} /> : <ArrowDownRight size={compact ? 11 : 14} />}
-      {change >= 0 ? '+' : ''}{change?.toFixed(2)} ({changePercent?.toFixed(2)}%)
+      {change >= 0 ? '+' : ''}{change?.toFixed(2)}
+      {currency && <span className="opacity-70">{currency}</span>}
+      {' '}({changePercent?.toFixed(2)}%)
     </span>
   );
 }
@@ -36,7 +38,7 @@ function ExtendedPriceInline({ label, price, change, changePercent, currency }) 
       <span className="text-sm sm:text-base font-bold text-foreground">{price.toLocaleString()}</span>
       <span className="text-[10px] text-muted uppercase">{currency}</span>
       {change != null && changePercent != null && (
-        <ChangeBadge change={change} changePercent={changePercent} size="sm" />
+        <ChangeBadge change={change} changePercent={changePercent} currency={currency} size="sm" />
       )}
     </span>
   );
@@ -208,13 +210,12 @@ export default function StockPage() {
           <div className="flex items-center gap-2 text-sm min-w-0">
             <Briefcase size={16} className="text-primary shrink-0" />
             <span className="truncate">
-              ถืออยู่ <strong>{position.shares}</strong> หุ้น @ {position.avg_cost?.toFixed(2)}
+              ถืออยู่ <strong>{position.shares}</strong> หุ้น @ {formatMoney(position.avg_cost, position.currency ?? currency)}
             </span>
           </div>
           {position.unrealized_pnl != null && (
             <span className={`text-sm font-mono font-bold ${position.unrealized_pnl >= 0 ? 'text-success' : 'text-danger'}`}>
-              {position.unrealized_pnl >= 0 ? '+' : ''}{position.unrealized_pnl?.toFixed(0)}
-              ({position.unrealized_pnl_pct?.toFixed(1)}%)
+              {formatPnl(position.unrealized_pnl, position.unrealized_pnl_pct, position.currency ?? currency)}
             </span>
           )}
         </Link>
@@ -233,6 +234,7 @@ export default function StockPage() {
                     <PriceAlertButton
                       symbol={quote.symbol}
                       currentPrice={quote.price}
+                      currency={currency}
                       alerts={alerts}
                       onChange={reloadAlerts}
                     />
@@ -243,27 +245,17 @@ export default function StockPage() {
                   <div className="flex flex-wrap items-baseline gap-x-2 sm:gap-x-3 gap-y-2">
                     <span className="text-2xl sm:text-3xl font-black">{quote.price?.toLocaleString()}</span>
                     <span className="text-xs text-muted uppercase">{currency}</span>
-                    <ChangeBadge change={quote.change} changePercent={quote.change_percent} />
+                    <ChangeBadge change={quote.change} changePercent={quote.change_percent} currency={currency} />
                     {(quote.pre_market_price != null || quote.post_market_price != null) && (
                       <>
                         <span className="hidden sm:inline text-border/80 text-sm leading-none select-none" aria-hidden="true">|</span>
-                        {quote.pre_market_price != null ? (
-                          <ExtendedPriceInline
-                            label="ก่อนตลาดเปิด"
-                            price={quote.pre_market_price}
-                            change={quote.pre_market_change}
-                            changePercent={quote.pre_market_change_percent}
-                            currency={currency}
-                          />
-                        ) : (
-                          <ExtendedPriceInline
-                            label="หลังตลาดปิด"
-                            price={quote.post_market_price}
-                            change={quote.post_market_change}
-                            changePercent={quote.post_market_change_percent}
-                            currency={currency}
-                          />
-                        )}
+                        <ExtendedPriceInline
+                          label={EXTENDED_HOURS_LABEL}
+                          price={quote.pre_market_price ?? quote.post_market_price}
+                          change={quote.pre_market_change ?? quote.post_market_change}
+                          changePercent={quote.pre_market_change_percent ?? quote.post_market_change_percent}
+                          currency={currency}
+                        />
                       </>
                     )}
                   </div>
@@ -271,12 +263,13 @@ export default function StockPage() {
                     && !quote.symbol.includes('.')
                     && ['CLOSED', 'PREPRE', 'POSTPOST'].includes(quote.market_state) && (
                     <p className="mt-2 text-[10px] text-muted/80 leading-relaxed border-t border-border/20 pt-2">
-                      ราคาก่อน/หลังตลาดจะแสดงเมื่อเริ่ม session extended hours (US pre-market ~21:00–03:30 น. ไทย)
+                      ราคาก่อนตลาดเปิดจะแสดงเมื่อเริ่มซื้อขายนอกเวลา (~21:00–03:30 น. ไทย)
                     </p>
                   )}
-                  {quote.market_state === 'PRE' && !quote.pre_market_price && (
+                  {(quote.market_state === 'PRE' || quote.market_state === 'POST')
+                    && !quote.pre_market_price && !quote.post_market_price && (
                     <p className="mt-2 text-[10px] text-warning/90">
-                      อยู่ช่วง pre-market แต่ Yahoo ยังไม่ส่งราคา — ลอง refresh อีกครั้ง
+                      อยู่ช่วง{EXTENDED_HOURS_LABEL} แต่ Yahoo ยังไม่ส่งราคา — ลอง refresh อีกครั้ง
                     </p>
                   )}
                   {marketUpdate && (

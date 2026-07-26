@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react';
-import { api } from '../api';
+import { api, inferCurrency, formatMoney } from '../api';
 import { useFavorites } from '../context/FavoritesContext';
 import { useQuotePoll } from '../hooks/useQuotePoll';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
@@ -72,7 +72,7 @@ function FavoriteCard({ symbol, alerts, onAlertChange }) {
   return (
     <div className="glass-card rounded-2xl p-5 hover:border-primary/50 transition-all group relative">
       <div className="absolute top-4 right-4 flex items-center gap-1 z-10">
-        <PriceAlertButton symbol={symbol} currentPrice={quote?.price} alerts={alerts} onChange={onAlertChange} compact />
+        <PriceAlertButton symbol={symbol} currentPrice={quote?.price} currency={quote?.currency} alerts={alerts} onChange={onAlertChange} compact />
         <button
           type="button"
           onClick={() => toggle(symbol)}
@@ -90,7 +90,10 @@ function FavoriteCard({ symbol, alerts, onAlertChange }) {
 
         {quote ? (
           <>
-            <p className="text-2xl font-black mt-3">{quote.price?.toLocaleString()}</p>
+            <p className="text-2xl font-black mt-3">
+              {quote.price?.toLocaleString()}
+              <span className="text-xs text-muted font-normal ml-1">{quote.currency}</span>
+            </p>
             <span className={`text-xs font-bold flex items-center gap-0.5 mt-1 ${isUp ? 'text-success' : 'text-danger'}`}>
               {isUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
               {quote.change_percent?.toFixed(2)}%

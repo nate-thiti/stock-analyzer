@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Briefcase, Plus, Trash2, Loader2, AlertTriangle, TrendingUp, TrendingDown, Pencil, BellRing,
 } from 'lucide-react';
-import { api } from '../api';
+import { api, formatNumber, formatMoney, formatSignedMoney, formatSignedPct, formatPnl, inferCurrency } from '../api';
 import { useQuotePoll } from '../hooks/useQuotePoll';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import PortfolioDashboard from '../components/PortfolioDashboard';
@@ -83,6 +83,8 @@ export default function PortfolioPage() {
   const totalValue = positions.reduce((s, p) => s + (p.market_value || 0), 0);
   const totalPnl = totalValue - totalCost;
   const totalPnlPct = totalCost ? (totalPnl / totalCost) * 100 : 0;
+  const currencies = [...new Set(positions.map((p) => p.currency).filter(Boolean))];
+  const portfolioCurrency = currencies.length === 1 ? currencies[0] : null;
 
   return (
     <div className="space-y-6 w-full min-w-0">
@@ -104,20 +106,29 @@ export default function PortfolioPage() {
       {positions.length > 0 && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <SummaryCard label="มูลค่ารวม" value={totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} />
-            <SummaryCard label="ต้นทุนรวม" value={totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })} />
+            <SummaryCard
+              label="มูลค่ารวม"
+              value={formatNumber(totalValue, { compact: true }) ?? '-'}
+              currency={portfolioCurrency}
+            />
+            <SummaryCard
+              label="ต้นทุนรวม"
+              value={formatNumber(totalCost, { compact: true }) ?? '-'}
+              currency={portfolioCurrency}
+            />
             <SummaryCard
               label="กำไร/ขาดทุน"
-              value={`${totalPnl >= 0 ? '+' : ''}${totalPnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+              value={formatSignedPct(totalPnlPct)}
+              suffix={`(${formatSignedMoney(totalPnl, portfolioCurrency, { compact: true })})`}
               positive={totalPnl >= 0}
             />
             <SummaryCard
               label="% P/L"
-              value={`${totalPnlPct >= 0 ? '+' : ''}${totalPnlPct.toFixed(2)}%`}
+              value={formatSignedPct(totalPnlPct)}
               positive={totalPnlPct >= 0}
             />
           </div>
-          <PortfolioDashboard positions={positions} totalValue={totalValue} />
+          <PortfolioDashboard positions={positions} totalValue={totalValue} portfolioCurrency={portfolioCurrency} />
         </>
       )}
 
@@ -133,7 +144,9 @@ export default function PortfolioPage() {
             {triggered.map((a) => (
               <span key={a.id} className="text-xs px-3 py-1.5 rounded-lg bg-warning/10 border border-warning/25">
                 <span className="font-mono font-bold">{a.symbol}</span>
-                <span className="text-muted ml-1">{a.direction === 'above' ? '≥' : '≤'} {a.target_price}</span>
+                <span className="text-muted ml-1">
+                  {a.direction === 'above' ? '≥' : '≤'} {formatMoney(a.target_price, inferCurrency(a.symbol))}
+                </span>
               </span>
             ))}
           </div>
@@ -193,15 +206,14 @@ export default function PortfolioPage() {
                           <AlertTriggeredBadge show={alerts.some((a) => a.symbol === p.symbol && a.triggered)} />
                         </td>
                         <td className="py-3 px-4 text-right font-mono">{p.shares}</td>
-                        <td className="py-3 px-4 text-right font-mono">{p.avg_cost?.toFixed(2)}</td>
-                        <td className="py-3 px-4 text-right font-mono">{p.current_price?.toFixed(2) ?? '-'}</td>
-                        <td className="py-3 px-4 text-right font-mono">{p.market_value?.toLocaleString() ?? '-'}</td>
+                        <td className="py-3 px-4 text-right font-mono">{formatMoney(p.avg_cost, p.currency)}</td>
+                        <td className="py-3 px-4 text-right font-mono">{p.current_price != null ? formatMoney(p.current_price, p.currency) : '-'}</td>
+                        <td className="py-3 px-4 text-right font-mono">{p.market_value != null ? formatMoney(p.market_value, p.currency, { compact: true }) : '-'}</td>
                         <td className={`py-3 px-4 text-right font-mono font-bold ${(p.unrealized_pnl ?? 0) >= 0 ? 'text-success' : 'text-danger'}`}>
                           {p.unrealized_pnl != null ? (
                             <span className="inline-flex items-center gap-0.5 justify-end">
                               {(p.unrealized_pnl ?? 0) >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                              {p.unrealized_pnl >= 0 ? '+' : ''}{p.unrealized_pnl?.toFixed(0)}
-                              <span className="text-[10px] font-normal ml-1">({p.unrealized_pnl_pct?.toFixed(1)}%)</span>
+                              {formatPnl(p.unrealized_pnl, p.unrealized_pnl_pct, p.currency)}
                             </span>
                           ) : '-'}
                         </td>
@@ -209,6 +221,7 @@ export default function PortfolioPage() {
                           <PriceAlertButton
                             symbol={p.symbol}
                             currentPrice={p.current_price}
+                            currency={p.currency}
                             alerts={alerts}
                             onChange={reloadAlerts}
                             compact
@@ -233,12 +246,16 @@ export default function PortfolioPage() {
   );
 }
 
-function SummaryCard({ label, value, positive }) {
+function SummaryCard({ label, value, suffix, currency, positive }) {
   const color = positive === undefined ? 'text-foreground' : positive ? 'text-success' : 'text-danger';
   return (
     <div className="glass-card rounded-xl p-4">
       <p className="text-[10px] text-muted uppercase">{label}</p>
-      <p className={`text-lg font-black mt-1 ${color}`}>{value}</p>
+      <p className={`text-lg font-black mt-1 ${color}`}>
+        {value}
+        {currency && <span className="text-xs font-bold text-muted uppercase ml-1">{currency}</span>}
+        {suffix && <span className="text-sm font-bold opacity-80 ml-1">{suffix}</span>}
+      </p>
     </div>
   );
 }

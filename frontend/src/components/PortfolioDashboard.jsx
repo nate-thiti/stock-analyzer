@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { TrendingUp, TrendingDown, PieChart } from 'lucide-react';
+import { formatSignedMoney, formatSignedPct } from '../api';
 
 const COLORS = [
   '#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4',
@@ -60,7 +61,7 @@ function PieChartSvg({ slices }) {
   );
 }
 
-export default function PortfolioDashboard({ positions, totalValue }) {
+export default function PortfolioDashboard({ positions, totalValue, portfolioCurrency }) {
   const withValue = positions.filter((p) => p.market_value != null);
   const symbolSlices = allocationBySymbol(withValue, totalValue);
   const sectors = groupBySector(withValue);
@@ -84,6 +85,7 @@ export default function PortfolioDashboard({ positions, totalValue }) {
               position={best}
               positive
               icon={<TrendingUp size={16} />}
+              currency={portfolioCurrency ?? best.currency}
             />
           )}
           {worst && (
@@ -92,6 +94,7 @@ export default function PortfolioDashboard({ positions, totalValue }) {
               position={worst}
               positive={worst.unrealized_pnl >= 0}
               icon={<TrendingDown size={16} />}
+              currency={portfolioCurrency ?? worst.currency}
             />
           )}
         </div>
@@ -147,7 +150,8 @@ export default function PortfolioDashboard({ positions, totalValue }) {
   );
 }
 
-function PerformerCard({ label, position, positive, icon }) {
+function PerformerCard({ label, position, positive, icon, currency }) {
+  const cur = currency ?? position.currency;
   return (
     <Link
       to={`/stock/${position.symbol}`}
@@ -157,8 +161,10 @@ function PerformerCard({ label, position, positive, icon }) {
       <p className="font-mono font-black text-lg mt-1">{position.symbol}</p>
       {position.name && <p className="text-xs text-muted truncate">{position.name}</p>}
       <p className={`text-sm font-mono font-bold mt-2 ${positive ? 'text-success' : 'text-danger'}`}>
-        {position.unrealized_pnl >= 0 ? '+' : ''}{position.unrealized_pnl?.toFixed(0)}
-        <span className="text-xs ml-1">({position.unrealized_pnl_pct?.toFixed(1)}%)</span>
+        {formatSignedPct(position.unrealized_pnl_pct, 1)}
+        <span className="text-xs ml-1 opacity-80">
+          ({formatSignedMoney(position.unrealized_pnl, cur, { compact: true })})
+        </span>
       </p>
     </Link>
   );
