@@ -255,6 +255,61 @@ def _quote_market_time(info: dict, hist: pd.DataFrame) -> tuple[str, Optional[st
     return datetime.now(timezone.utc).isoformat(), market_state, tz_name
 
 
+def _optional_quote_float(value) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        num = float(value)
+        if num != num or num <= 0:  # NaN or invalid
+            return None
+        return round(num, 2)
+    except (TypeError, ValueError):
+        return None
+
+
+def _extended_session(
+    info: dict,
+    market_state: Optional[str],
+    reference_close: Optional[float],
+) -> dict:
+    """Extract pre/post-market from Yahoo — fallback to currentPrice in PRE/POST."""
+    pre_price = _optional_quote_float(info.get("preMarketPrice"))
+    pre_change = _optional_quote_float(info.get("preMarketChange"))
+    pre_change_pct = _optional_quote_float(info.get("preMarketChangePercent"))
+
+    post_price = _optional_quote_float(info.get("postMarketPrice"))
+    post_change = _optional_quote_float(info.get("postMarketChange"))
+    post_change_pct = _optional_quote_float(info.get("postMarketChangePercent"))
+
+    current = _optional_quote_float(info.get("currentPrice"))
+
+    if market_state == "PRE" and pre_price is None and current is not None:
+        pre_price = current
+    if market_state == "POST" and post_price is None and current is not None:
+        post_price = current
+
+    ref = reference_close or _optional_quote_float(
+        info.get("regularMarketPreviousClose") or info.get("previousClose")
+    )
+
+    if pre_price is not None and pre_change is None and ref is not None:
+        pre_change = round(pre_price - ref, 2)
+        pre_change_pct = round(pre_change / ref * 100, 2) if ref else None
+
+    if post_price is not None and post_change is None and ref is not None:
+        post_change = round(post_price - ref, 2)
+        post_change_pct = round(post_change / ref * 100, 2) if ref else None
+
+    return {
+        "pre_market_price": pre_price,
+        "pre_market_change": pre_change,
+        "pre_market_change_percent": pre_change_pct,
+        "post_market_price": post_price,
+        "post_market_change": post_change,
+        "post_market_change_percent": post_change_pct,
+    }
+
+
 def get_stock_quote(symbol: str) -> Optional[StockQuote]:
     cleaned = clean_symbol(symbol)
     now = time.time()
@@ -273,13 +328,29 @@ def get_stock_quote(symbol: str) -> Optional[StockQuote]:
         if hist.empty:
             return None
 
-        price = round(float(hist["Close"].iloc[-1]), 2)
-        prev = float(hist["Close"].iloc[-2]) if len(hist) > 1 else price
-        change = round(price - prev, 2)
-        change_pct = round(change / prev * 100, 2) if prev else 0
-
         market_time, market_state, exchange_timezone = _quote_market_time(info, hist)
         fetched_at = datetime.now(timezone.utc).isoformat()
+
+        regular_price = _optional_quote_float(info.get("regularMarketPrice"))
+        prev_close = _optional_quote_float(
+            info.get("regularMarketPreviousClose") or info.get("previousClose")
+        )
+
+        if regular_price is not None:
+            price = regular_price
+            if prev_close is not None:
+                change = round(price - prev_close, 2)
+                change_pct = round(change / prev_close * 100, 2) if prev_close else 0
+            else:
+                change = round(float(hist["Close"].iloc[-1]) - float(hist["Close"].iloc[-2]), 2) if len(hist) > 1 else 0
+                change_pct = round(change / float(hist["Close"].iloc[-2]) * 100, 2) if len(hist) > 1 else 0
+        else:
+            price = round(float(hist["Close"].iloc[-1]), 2)
+            prev = float(hist["Close"].iloc[-2]) if len(hist) > 1 else price
+            change = round(price - prev, 2)
+            change_pct = round(change / prev * 100, 2) if prev else 0
+
+        extended = _extended_session(info, market_state, prev_close or price)
 
         quote = StockQuote(
             symbol=cleaned,
@@ -293,6 +364,7 @@ def get_stock_quote(symbol: str) -> Optional[StockQuote]:
             market_state=market_state,
             exchange_timezone=exchange_timezone,
             fetched_at=fetched_at,
+            **extended,
         )
         quote_cache[cleaned] = {"timestamp": now, "data": quote}
         return quote

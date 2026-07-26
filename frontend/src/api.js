@@ -181,8 +181,8 @@ export function formatPct(val, decimals = 1) {
 const MARKET_STATE_LABELS = {
   REGULAR: 'ตลาดเปิด',
   CLOSED: 'ตลาดปิด',
-  PRE: 'Pre-market',
-  POST: 'After-hours',
+  PRE: 'ก่อนตลาดเปิด',
+  POST: 'หลังตลาดปิด',
   PREPRE: 'ตลาดปิด',
   POSTPOST: 'ตลาดปิด',
 };

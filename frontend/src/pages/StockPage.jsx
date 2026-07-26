@@ -15,6 +15,25 @@ import PriceAlertButton from '../components/PriceAlertButton';
 import DividendPanel from '../components/DividendPanel';
 import SelectField from '../components/SelectField';
 
+function ExtendedPriceLine({ label, price, change, changePercent, currency }) {
+  if (price == null) return null;
+  const up = (change ?? 0) >= 0;
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mt-2 pt-2 border-t border-border/30">
+      <span className="text-[10px] font-bold uppercase text-warning/90 tracking-wide">{label}</span>
+      <span className="text-lg sm:text-xl font-bold text-foreground">{price.toLocaleString()}</span>
+      <span className="text-[10px] text-muted uppercase">{currency}</span>
+      {change != null && changePercent != null && (
+        <span className={`flex items-center text-[11px] font-semibold px-1.5 py-0.5 rounded-md border ${
+          up ? 'bg-success/5 border-success/20 text-success' : 'bg-danger/5 border-danger/20 text-danger'
+        }`}>
+          {up ? '+' : ''}{change.toFixed(2)} ({changePercent.toFixed(2)}%)
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function StockPage() {
   const { symbol } = useParams();
   const [quote, setQuote] = useState(null);
@@ -223,6 +242,36 @@ export default function StockPage() {
                       {quote.change >= 0 ? '+' : ''}{quote.change?.toFixed(2)} ({quote.change_percent?.toFixed(2)}%)
                     </span>
                   </div>
+                  {quote.pre_market_price != null && (
+                    <ExtendedPriceLine
+                      label="ก่อนตลาดเปิด"
+                      price={quote.pre_market_price}
+                      change={quote.pre_market_change}
+                      changePercent={quote.pre_market_change_percent}
+                      currency={currency}
+                    />
+                  )}
+                  {quote.post_market_price != null && (
+                    <ExtendedPriceLine
+                      label="หลังตลาดปิด"
+                      price={quote.post_market_price}
+                      change={quote.post_market_change}
+                      changePercent={quote.post_market_change_percent}
+                      currency={currency}
+                    />
+                  )}
+                  {!quote.pre_market_price && !quote.post_market_price
+                    && !quote.symbol.includes('.')
+                    && ['CLOSED', 'PREPRE', 'POSTPOST'].includes(quote.market_state) && (
+                    <p className="mt-2 text-[10px] text-muted/80 leading-relaxed border-t border-border/20 pt-2">
+                      ราคาก่อน/หลังตลาดจะแสดงเมื่อเริ่ม session extended hours (US pre-market ~21:00–03:30 น. ไทย)
+                    </p>
+                  )}
+                  {quote.market_state === 'PRE' && !quote.pre_market_price && (
+                    <p className="mt-2 text-[10px] text-warning/90">
+                      อยู่ช่วง pre-market แต่ Yahoo ยังไม่ส่งราคา — ลอง refresh อีกครั้ง
+                    </p>
+                  )}
                   {marketUpdate && (
                     <div className="mt-2 space-y-1 text-[11px] text-muted">
                       <p className="flex items-center gap-1.5 flex-wrap">
@@ -243,7 +292,7 @@ export default function StockPage() {
                         <Radio size={10} className={`text-primary shrink-0 ${quoteRefreshing ? 'animate-pulse' : ''}`} />
                         <span>
                           ดึงข้อมูลเมื่อ {formatFetchedAt(quote.fetched_at)}
-                          <span className="text-primary/80 ml-1">• auto 30s</span>
+                          <span className="text-primary/80 ml-1">• auto 1 นาที</span>
                         </span>
                       </p>
                     </div>

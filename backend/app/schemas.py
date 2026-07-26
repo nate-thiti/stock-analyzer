@@ -13,6 +13,12 @@ class StockQuote(BaseModel):
     market_state: Optional[str] = None
     exchange_timezone: Optional[str] = None
     fetched_at: Optional[str] = None
+    pre_market_price: Optional[float] = None
+    pre_market_change: Optional[float] = None
+    pre_market_change_percent: Optional[float] = None
+    post_market_price: Optional[float] = None
+    post_market_change: Optional[float] = None
+    post_market_change_percent: Optional[float] = None
 
 class StockHistoryItem(BaseModel):
     time: str
