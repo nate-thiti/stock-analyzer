@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api';
 import { useQuotePoll } from './useQuotePoll';
+import { handleTriggeredAlerts } from '../utils/alertSound';
 
 export function usePriceAlerts({ enabled = true, poll = true } = {}) {
   const [alerts, setAlerts] = useState([]);
@@ -10,6 +11,7 @@ export function usePriceAlerts({ enabled = true, poll = true } = {}) {
     if (!enabled) return;
     try {
       const list = await api.listPriceAlerts();
+      handleTriggeredAlerts(list);
       setAlerts(list);
     } catch {
       setAlerts([]);

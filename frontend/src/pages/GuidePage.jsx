@@ -381,7 +381,7 @@ export default function GuidePage() {
             'หน้า /alerts — ฟอร์มตั้งใหม่',
           ]}
           reverse
-          tip={{ text: 'Alert ไม่ส่ง push notification ทาง email — ต้องเปิดเว็บเพื่อดู (ตรวจทุก 1 นาที)', variant: 'warn' }}
+          tip={{ text: 'Alert ไม่ส่ง push/email — ต้องเปิดเว็บ (ตรวจทุก 1 นาที, มีเสียงเมื่อถึงเป้าใหม่)', variant: 'warn' }}
         />
       </GuideSection>
 
