@@ -410,9 +410,6 @@ export default function StockPage() {
           currency={currency}
           planLoading={analysisLoading}
           position={position}
-          currentPrice={quote?.price ?? analysis.current_price}
-          priceRange={chartPriceRange}
-          rangeLabel={chartRangeLabel}
         />
       )}
     </div>

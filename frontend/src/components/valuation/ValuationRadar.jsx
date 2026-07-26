@@ -49,10 +49,10 @@ export default function ValuationRadar({ fundamental, large = false }) {
   const polygon = dataPoints.map((p) => `${p.x},${p.y}`).join(' ');
 
   return (
-    <div className="w-full">
+    <div className="w-[180px]">
       <svg
         viewBox="0 0 240 240"
-        className={`w-full mx-auto ${large ? 'max-w-[220px] min-h-[180px]' : 'max-w-[280px]'}`}
+        className={`w-full h-[180px] mx-auto ${large ? 'max-w-[180px]' : 'max-w-[280px]'}`}
       >
         {gridLevels.map((level) => (
           <polygon
