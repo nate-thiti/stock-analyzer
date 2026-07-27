@@ -92,6 +92,7 @@ class PriceAlertOut(BaseModel):
     triggered_at: Optional[datetime] = None
     created_at: datetime
     current_price: Optional[float] = None
+    change_percent: Optional[float] = None
     triggered: bool = False
 
     class Config:

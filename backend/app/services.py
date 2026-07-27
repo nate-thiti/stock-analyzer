@@ -7,6 +7,7 @@ import threading
 from typing import Dict, Any, Optional, List
 from .schemas import StockQuote, StockHistoryItem, StockInfo
 from .fundamentals import RawFinancials, compute_fundamentals
+from .market_hours import infer_market_state, merge_yahoo_info, pick_info_str
 
 QUOTE_CACHE_EXPIRY = 60
 HISTORY_CACHE_EXPIRY = 60
@@ -49,6 +50,10 @@ def _get_ticker(symbol: str):
     if cleaned not in _ticker_cache:
         _ticker_cache[cleaned] = yf.Ticker(cleaned)
     return _ticker_cache[cleaned]
+
+
+def _ticker_info(ticker) -> dict:
+    return merge_yahoo_info(ticker)
 
 
 def _row_val(df: pd.DataFrame, col, *names) -> Optional[float]:
@@ -172,7 +177,7 @@ def _dividends_from_yf(ticker) -> List[dict]:
 
 def _fetch_raw_data(cleaned: str) -> RawFinancials:
     ticker = _get_ticker(cleaned)
-    info = ticker.info or {}
+    info = _ticker_info(ticker)
     income_quarters = _income_quarters_from_yf(ticker)
 
     shares = _safe_float(info.get("sharesOutstanding"))
@@ -184,8 +189,8 @@ def _fetch_raw_data(cleaned: str) -> RawFinancials:
         name=info.get("shortName") or info.get("longName"),
         currency=info.get("currency"),
         exchange=info.get("exchange") or info.get("fullExchangeName"),
-        sector=info.get("sector"),
-        industry=info.get("industry"),
+        sector=pick_info_str(info, "sector", "sectorDisp"),
+        industry=pick_info_str(info, "industry", "industryDisp"),
         summary=info.get("longBusinessSummary"),
         income_quarters=income_quarters,
         balance_latest=_balance_from_yf(ticker),
@@ -255,6 +260,22 @@ def _quote_market_time(info: dict, hist: pd.DataFrame) -> tuple[str, Optional[st
     return datetime.now(timezone.utc).isoformat(), market_state, tz_name
 
 
+def _day_stats_from_quote(info: dict, hist: pd.DataFrame, market_state: Optional[str]):
+    day_open = _optional_quote_float(info.get("regularMarketOpen") or info.get("open"))
+    day_high = _optional_quote_float(info.get("regularMarketDayHigh") or info.get("dayHigh"))
+    day_low = _optional_quote_float(info.get("regularMarketDayLow") or info.get("dayLow"))
+
+    if market_state == "REGULAR" and hist is not None and not hist.empty:
+        last = hist.iloc[-1]
+        if day_open is None:
+            day_open = _optional_quote_float(last.get("Open"))
+        if day_high is None:
+            day_high = _optional_quote_float(last.get("High"))
+        if day_low is None:
+            day_low = _optional_quote_float(last.get("Low"))
+    return day_open, day_high, day_low
+
+
 def _optional_quote_float(value) -> Optional[float]:
     if value is None:
         return None
@@ -313,7 +334,7 @@ def _extended_session(
 def get_stock_quote(symbol: str) -> Optional[StockQuote]:
     cleaned = clean_symbol(symbol)
     now = time.time()
-
+    
     if cleaned in quote_cache and now - quote_cache[cleaned]["timestamp"] < QUOTE_CACHE_EXPIRY:
         cached = quote_cache[cleaned]["data"]
         if isinstance(cached, StockQuote):
@@ -322,13 +343,15 @@ def get_stock_quote(symbol: str) -> Optional[StockQuote]:
 
     try:
         ticker = _get_ticker(cleaned)
-        info = ticker.info or {}
+        info = _ticker_info(ticker)
         hist = ticker.history(period="5d")
 
         if hist.empty:
             return None
 
         market_time, market_state, exchange_timezone = _quote_market_time(info, hist)
+        if not market_state:
+            market_state = infer_market_state(cleaned, exchange_timezone)
         fetched_at = datetime.now(timezone.utc).isoformat()
 
         regular_price = _optional_quote_float(info.get("regularMarketPrice"))
@@ -352,10 +375,8 @@ def get_stock_quote(symbol: str) -> Optional[StockQuote]:
 
         extended = _extended_session(info, market_state, prev_close or price)
 
-        day_open = _optional_quote_float(info.get("regularMarketOpen") or info.get("open"))
-        day_high = _optional_quote_float(info.get("regularMarketDayHigh") or info.get("dayHigh"))
-        day_low = _optional_quote_float(info.get("regularMarketDayLow") or info.get("dayLow"))
-
+        day_open, day_high, day_low = _day_stats_from_quote(info, hist, market_state)
+        
         quote = StockQuote(
             symbol=cleaned,
             name=info.get("shortName") or info.get("longName") or cleaned,
@@ -392,17 +413,17 @@ def get_stock_info(symbol: str, price: Optional[float] = None, history_df=None) 
 
     metrics = compute_fundamentals(price, raw, history_df)
     ticker = _get_ticker(cleaned)
-    info = ticker.info or {}
+    info = _ticker_info(ticker)
 
     dividends = raw.dividends or []
     annual_dividend = round(sum(d["amount"] for d in dividends[:4]), 4) if dividends else None
 
     return StockInfo(
-        symbol=cleaned,
-        name=raw.name,
-        summary=raw.summary,
-        industry=raw.industry,
-        sector=raw.sector,
+            symbol=cleaned,
+        name=raw.name or info.get("shortName") or info.get("longName"),
+        summary=raw.summary or info.get("longBusinessSummary"),
+        industry=raw.industry or pick_info_str(info, "industry", "industryDisp"),
+        sector=raw.sector or pick_info_str(info, "sector", "sectorDisp"),
         dividends=dividends,
         annual_dividend=annual_dividend,
         pe_ratio=metrics.get("pe_ratio"),
@@ -451,7 +472,7 @@ def get_stock_history(symbol: str, period: str = "1mo", interval: str = "1d") ->
     yf_interval = INTERVAL_MAP.get(interval, "1d")
     cache_key = f"{cleaned}_{yf_period}_{yf_interval}"
     now = time.time()
-
+    
     if cache_key in history_cache and now - history_cache[cache_key]["timestamp"] < HISTORY_CACHE_EXPIRY:
         return history_cache[cache_key]["data"]
 
@@ -460,7 +481,7 @@ def get_stock_history(symbol: str, period: str = "1mo", interval: str = "1d") ->
         df = ticker.history(period=yf_period, interval=yf_interval)
         if df.empty:
             return []
-
+        
         history = []
         for idx, row in df.iterrows():
             history.append(StockHistoryItem(

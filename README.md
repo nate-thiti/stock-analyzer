@@ -21,19 +21,19 @@
 - ราคา, ข้อมูลบริษัท, กราฟแท่งเทียน (Lightweight Charts)
 - **สถานะตลาด & ราคานอกเวลา**
   - ราคาหลัก = ราคาช่วงตลาดเปิด (`regularMarketPrice`)
-  - ราคา **ก่อนตลาดเปิด** แสดง inline ข้างราคาหลัก (pre/post จาก Yahoo — ใช้ป้าย **"ก่อนตลาดเปิด"** ทั้ง pre และ post)
+  - ราคา **ก่อนตลาดเปิด** (PRE) และ **ก่อนตลาดปิด** (POST) แสดง inline แยกป้าย
   - ตอน **ตลาดเปิด** — กริด **เปิดวัน / สูงสุด / ต่ำสุด** (`day_open`, `day_high`, `day_low`)
-  - Badge **ตลาดเปิด** (จุดเขียวกระพริบ) ข้าง symbol
+  - Badge **ตลาดเปิด** (จุดเขียวกระพริบ) ข้าง symbol — infer สถานะตลาดเมื่อ Yahoo ไม่ส่ง `marketState`
 - **ช่วงราคาตามกราฟ** — ต่ำสุด/สูงสุดคำนวณจากแท่งเทียนที่เลือก (dropdown ช่วงเวลา + แท่งเทียน) พร้อมแถบตำแหน่งราคาปัจจุบัน
 - **กราฟเทคนิคอัตโนมัติ** — EMA 9/21/50, RSI, MACD, Support/Resistance, ป้ายเทรนด์ (hover `?` อธิบายคำศัพท์)
 - กราฟปรับขนาดบนมือถือ (แผน RSI/MACD เล็กลง)
 - **Valuation** — P/E, PEG, P/S, P/B, ROE, score ring + radar chart (ขนาดเท่ากัน), งบรายไตรมาส, ประวัติ P/E
 - **เงินปันผล** — ประวัติงวด, ประมาณการ/ปี, Div Yield
-- **Trading Plan** — คำแนะนำซื้อ/ถือ/ขาย, stop loss, target, position sizing, DCA
+- **Trading Plan** — คำแนะนำซื้อ/ถือ/ขาย, stop loss, target, position sizing, DCA — **บทวิเคราะห์ภาษาไทยละเอียด** (พื้นฐาน / เทคนิค / ความเสี่ยง / แผนปฏิบัติ)
 - สลับโหมด **"ถืออยู่แล้ว" / "ยังไม่ได้ซื้อ"** สำหรับคำแนะนำที่ต่างกัน
 - ราคา / กราฟ / วิเคราะห์ refresh ทุก **1 นาที**
 - แสดง **เวลาซื้อขายล่าสุด** (จาก Yahoo) และ **เวลาที่ดึงข้อมูล** (`fetched_at`) แยกกัน
-- ปุ่ม ⭐ เพิ่มรายการโปรด, **Price Alert** ตั้งแจ้งเตือนเมื่อราคาถึงเป้า
+- ปุ่ม ⭐ เพิ่มรายการโปรด, **Price Alert** ตั้งแจ้งเตือนเมื่อราคาถึงเป้า (modal มี **Quick set ±5/10%** จากราคาปัจจุบัน)
 - Banner แสดงถ้าถือหุ้นในพอร์ต
 
 ### พอร์ต (`/portfolio`)
@@ -56,8 +56,10 @@
 - **Price Alert** ต่อหุ้น (ปุ่ม 🔔 บนการ์ด)
 
 ### แจ้งเตือนราคา (`/alerts`)
-- หน้าจัดการ alert ทั้งหมด — สรุป ทั้งหมด / กำลังเฝ้า / ถึงเป้าแล้ว
-- ฟอร์มตั้ง alert ใหม่, filter ตาราง, ลบได้
+- หน้าจัดการ alert ทั้งหมด — สรุป ทั้งหมด / กำลังเฝ้า / ถึงเป้าแล้ว (header แถวเดียวบน desktop)
+- ฟอร์มตั้ง alert ใหม่ (สัญลักษณ์ | เงื่อนไข | ราคาเป้า | ปุ่ม) — **ไม่มี Quick set** (ใช้ modal ในหน้าหุ้นแทน)
+- ตาราง: ราคาปัจจุบัน **สีเขียว/แดง** ตาม % เปลี่ยนแปลงวัน + แสดง **อีก X% ถึงเป้า**
+- filter ตาราง, ลบได้, แบนเนอร์เมื่อ trigger
 - ตรวจราคา auto ทุก **1 นาที** — badge กระดิ่งใน header เมื่อ trigger
 - ตั้งได้จาก: หน้าหุ้น, พอร์ต, รายการโปรด, หน้า `/alerts`
 
@@ -155,6 +157,7 @@ stock-analyzer/
 │       ├── main.py
 │       ├── services.py
 │       ├── analysis.py
+│       ├── market_hours.py   # infer สถานะตลาด + merge Yahoo fast_info
 │       ├── risk.py
 │       ├── fundamentals.py
 │       ├── valuation_charts.py
@@ -190,6 +193,7 @@ stock-analyzer/
         │   ├── recentStocks.js
         │   ├── chartIndicators.js
         │   ├── chartPriceRange.js   # min/max จาก history ตาม period/interval
+        │   ├── priceAlert.js        # ระยะห่างถึงเป้า + quick set offset
         │   ├── alertSound.js
         │   └── glossary.js
         ├── context/
@@ -213,6 +217,7 @@ stock-analyzer/
             ├── MarketSignalSections.jsx
             ├── PortfolioDashboard.jsx
             ├── PriceAlertButton.jsx
+            ├── AlertQuickSet.jsx       # ปุ่ม ±% ใน modal alert (หน้าหุ้น/โปรด)
             ├── PriceRangeGrid.jsx      # ช่วงราคาต่ำ/สูงตามกราฟ
             ├── MarketStateBadge.jsx    # badge สถานะตลาด (เปิด/ปิด/ก่อนตลาดเปิด)
             ├── DayQuoteStats.jsx       # เปิดวัน / สูง / ต่ำ ตอนตลาดเปิด
@@ -233,14 +238,13 @@ stock-analyzer/
 ## เริ่มต้นใช้งาน (Docker — แนะนำ)
 
 ```bash
-# 1. คัดลอก env
+# 1. คัดลอก env (optional — สำหรับ JWT, admin, Ko-fi)
 cp .env.example .env
 
-# 2. ตั้ง DATABASE_URL — Neon Postgres (แนะนำ)
-#    ไปที่ neon.tech → สร้าง project → copy connection string
-# DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST/neondb?sslmode=require
-#    หรือ SQLite สำหรับ dev แบบ offline:
-# DATABASE_URL=sqlite:////data/app.db
+# 2. Local Docker ใช้ SQLite อัตโนมัติ — ไม่ต้องตั้ง DATABASE_URL
+#    (docker-compose.yml บังคับ sqlite:////data/app.db)
+#    สำหรับ Render/Neon: ตั้ง DATABASE_URL บน cloud โดยตรง
+#    สำหรับ Docker + Postgres: docker compose -f docker-compose.yml -f docker-compose.prod.yml up
 
 # 3. แก้ JWT_SECRET และรหัส admin ก่อน deploy จริง
 
@@ -389,7 +393,7 @@ docker compose up -d   # restart backend — ไม่ต้อง rebuild front
 
 | Method | Path | คำอธิบาย |
 |--------|------|----------|
-| GET | `/api/price-alerts` | รายการ alert + สถานะ triggered |
+| GET | `/api/price-alerts` | รายการ alert + ราคาปัจจุบัน + `change_percent` + สถานะ triggered |
 | POST | `/api/price-alerts` | สร้าง `{ "symbol", "target_price", "direction": "above\|below" }` |
 | DELETE | `/api/price-alerts/{id}` | ลบ alert |
 
@@ -442,7 +446,8 @@ docker compose up -d   # restart backend — ไม่ต้อง rebuild front
 | สถานะ | ความหมาย | UI |
 |--------|----------|-----|
 | `REGULAR` | ตลาดเปิด | จุดเขียวกระพริบ + กริด เปิดวัน/สูง/ต่ำ |
-| `PRE` / `POST` | ก่อนตลาดเปิด / หลังปิด | ราคา extended inline + ป้าย "ก่อนตลาดเปิด" |
+| `PRE` | ก่อนตลาดเปิด | ราคา pre-market inline |
+| `POST` | ก่อนตลาดปิด | ราคา post-market inline |
 | `CLOSED` | ตลาดปิด | ราคาปิดวัน — อาจมี post-market ค้าง |
 
 ฟิลด์ quote ที่เกี่ยวข้อง:

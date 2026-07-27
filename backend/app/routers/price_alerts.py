@@ -25,7 +25,8 @@ def _is_triggered(current: float | None, target: float, direction: str) -> bool:
     return current <= target
 
 
-def _alert_out(alert: PriceAlert, current: float | None) -> PriceAlertOut:
+def _alert_out(alert: PriceAlert, quote) -> PriceAlertOut:
+    current = quote.price if quote else None
     triggered = _is_triggered(current, alert.target_price, alert.direction)
     return PriceAlertOut(
         id=alert.id,
@@ -35,6 +36,7 @@ def _alert_out(alert: PriceAlert, current: float | None) -> PriceAlertOut:
         triggered_at=alert.triggered_at,
         created_at=alert.created_at,
         current_price=current,
+        change_percent=quote.change_percent if quote else None,
         triggered=triggered or alert.triggered_at is not None,
     )
 
@@ -56,7 +58,7 @@ def list_alerts(user: User = Depends(get_current_user), db: Session = Depends(ge
         if _is_triggered(current, alert.target_price, alert.direction) and alert.triggered_at is None:
             alert.triggered_at = now
             dirty = True
-        result.append(_alert_out(alert, current))
+        result.append(_alert_out(alert, quote))
     if dirty:
         db.commit()
     return result
@@ -95,7 +97,7 @@ def create_alert(
     db.add(alert)
     db.commit()
     db.refresh(alert)
-    return _alert_out(alert, quote.price)
+    return _alert_out(alert, quote)
 
 
 @router.delete("/{alert_id}", status_code=204)

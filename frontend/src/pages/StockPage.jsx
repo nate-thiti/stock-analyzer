@@ -4,7 +4,7 @@ import {
   ArrowUpRight, ArrowDownRight, AlertTriangle, Building2,
   GitCompare, Info, BarChart3, Percent, Coins, Layers, Loader2, Clock, Radio, Briefcase,
 } from 'lucide-react';
-import { api, formatHistoryDate, formatMarketCap, formatMarketTime, formatFetchedAt, formatPct, formatMoney, formatPnl, EXTENDED_HOURS_LABEL, isMarketRegular } from '../api';
+import { api, formatHistoryDate, formatMarketCap, formatMarketTime, formatFetchedAt, formatPct, formatMoney, formatPnl, EXTENDED_HOURS_LABEL, POST_MARKET_LABEL, isMarketRegular } from '../api';
 import { useQuotePoll, ANALYSIS_POLL_MS } from '../hooks/useQuotePoll';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import { addRecentStock } from '../utils/recentStocks';
@@ -259,17 +259,28 @@ export default function StockPage() {
                     {(quote.pre_market_price != null || quote.post_market_price != null) && (
                       <>
                         <span className="hidden sm:inline text-border/80 text-sm leading-none select-none" aria-hidden="true">|</span>
-                        <ExtendedPriceInline
-                          label={EXTENDED_HOURS_LABEL}
-                          price={quote.pre_market_price ?? quote.post_market_price}
-                          change={quote.pre_market_change ?? quote.post_market_change}
-                          changePercent={quote.pre_market_change_percent ?? quote.post_market_change_percent}
-                          currency={currency}
-                        />
+                        {quote.pre_market_price != null && (
+                          <ExtendedPriceInline
+                            label={EXTENDED_HOURS_LABEL}
+                            price={quote.pre_market_price}
+                            change={quote.pre_market_change}
+                            changePercent={quote.pre_market_change_percent}
+                            currency={currency}
+                          />
+                        )}
+                        {quote.post_market_price != null && (
+                          <ExtendedPriceInline
+                            label={POST_MARKET_LABEL}
+                            price={quote.post_market_price}
+                            change={quote.post_market_change}
+                            changePercent={quote.post_market_change_percent}
+                            currency={currency}
+                          />
+                        )}
                       </>
                     )}
                   </div>
-                  {isMarketRegular(quote.market_state) && (
+                  {(isMarketRegular(quote.market_state) || quote.day_open != null || quote.day_high != null || quote.day_low != null) && (
                     <DayQuoteStats
                       open={quote.day_open}
                       high={quote.day_high}
@@ -287,7 +298,7 @@ export default function StockPage() {
                   {(quote.market_state === 'PRE' || quote.market_state === 'POST')
                     && !quote.pre_market_price && !quote.post_market_price && (
                     <p className="mt-2 text-[10px] text-warning/90">
-                      อยู่ช่วง{EXTENDED_HOURS_LABEL} แต่ Yahoo ยังไม่ส่งราคา — ลอง refresh อีกครั้ง
+                      อยู่ช่วง{quote.market_state === 'POST' ? POST_MARKET_LABEL : EXTENDED_HOURS_LABEL} แต่ Yahoo ยังไม่ส่งราคา — ลอง refresh อีกครั้ง
                     </p>
                   )}
                   {marketUpdate && (
@@ -384,9 +395,17 @@ export default function StockPage() {
               <InfoItem icon={<Percent size={11} />} label="Div Yield" value={formatPct(info.dividend_yield)} />
               <InfoItem icon={<Info size={11} />} label="Beta" value={info.beta?.toFixed(2)} />
             </div>
-            {info.summary && (
+            {info.summary ? (
               <p className="text-xs text-muted leading-relaxed flex-1 min-h-0 overflow-y-auto">{info.summary}</p>
+            ) : (
+              <p className="text-[10px] text-muted/80 italic">Yahoo ยังไม่ส่งข้อมูลสรุปธุรกิจ — ลอง refresh หรือกลับมาใหม่ภายหลัง</p>
             )}
+          </div>
+        )}
+        {!info && analysisLoading && (
+          <div className="glass-card rounded-2xl p-4 sm:p-5 h-full flex items-center justify-center text-sm text-muted min-h-[12rem]">
+            <Loader2 size={18} className="animate-spin text-primary mr-2" />
+            กำลังโหลดข้อมูลบริษัท...
           </div>
         )}
       </div>

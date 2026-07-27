@@ -8,7 +8,9 @@ services:
       - path: .env
         required: false
     environment:
-      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/app.db}
+      # Local Docker ใช้ SQLite เสมอ — ไม่อ่าน DATABASE_URL จาก .env (Neon/Render)
+      # ถ้าต้องการ Postgres ใน Docker: ใช้ docker-compose.prod.yml หรือ override เอง
+      DATABASE_URL: sqlite:////data/app.db
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       APP_ENV: ${APP_ENV:-development}

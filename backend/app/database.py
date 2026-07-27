@@ -11,6 +11,9 @@ elif DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+if DATABASE_URL.startswith("postgresql") and "sslmode" not in DATABASE_URL:
+    sep = "&" if "?" in DATABASE_URL else "?"
+    DATABASE_URL = f"{DATABASE_URL}{sep}sslmode=require"
 engine = create_engine(
     DATABASE_URL,
     connect_args=connect_args,

@@ -222,12 +222,13 @@ export function formatPnl(amount, pct, currency, { pctDecimals = 1 } = {}) {
 }
 
 export const EXTENDED_HOURS_LABEL = 'ก่อนตลาดเปิด';
+export const POST_MARKET_LABEL = 'ก่อนตลาดปิด';
 
 const MARKET_STATE_LABELS = {
   REGULAR: 'ตลาดเปิด',
   CLOSED: 'ตลาดปิด',
   PRE: EXTENDED_HOURS_LABEL,
-  POST: EXTENDED_HOURS_LABEL,
+  POST: POST_MARKET_LABEL,
   PREPRE: 'ตลาดปิด',
   POSTPOST: 'ตลาดปิด',
 };

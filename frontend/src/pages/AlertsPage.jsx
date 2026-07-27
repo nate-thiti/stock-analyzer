@@ -1,14 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Bell, BellRing, Loader2, Trash2, Plus,
   TrendingUp, TrendingDown, ExternalLink, ArrowUp, ArrowDown,
 } from 'lucide-react';
-import { api, inferCurrency, formatMoney, formatSignedMoney } from '../api';
+import { api, inferCurrency, formatMoney, formatSignedMoney, formatSignedPct } from '../api';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import SelectField from '../components/SelectField';
 import SegmentedControl from '../components/SegmentedControl';
-import AlertQuickSet from '../components/AlertQuickSet';
 import { computeDistanceToTrigger, distanceColorClass } from '../utils/priceAlert';
 
 function directionLabel(direction) {
@@ -26,30 +25,6 @@ export default function AlertsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const [quotePrice, setQuotePrice] = useState(null);
-  const [quoteLoading, setQuoteLoading] = useState(false);
-
-  useEffect(() => {
-    const sym = form.symbol.trim().toUpperCase();
-    if (!sym) {
-      setQuotePrice(null);
-      return undefined;
-    }
-    const timer = setTimeout(async () => {
-      setQuoteLoading(true);
-      try {
-        const q = await api.quote(sym);
-        setQuotePrice(q?.price ?? null);
-      } catch {
-        setQuotePrice(null);
-      } finally {
-        setQuoteLoading(false);
-      }
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [form.symbol]);
-
-  const formCurrency = inferCurrency(form.symbol.trim());
 
   const active = alerts.filter((a) => !a.triggered);
 
@@ -93,21 +68,22 @@ export default function AlertsPage() {
   };
 
   return (
-    <div className="space-y-6 w-full min-w-0">
-      <div>
-        <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
-          <Bell size={24} className="text-primary" />
-          แจ้งเตือนราคา
-        </h2>
-        <p className="text-sm text-muted mt-1">
-          จัดการ alert ทั้งหมด — ตรวจอัตโนมัติทุก 1 นาที
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-        <StatCard label="ทั้งหมด" value={alerts.length} />
-        <StatCard label="กำลังเฝ้า" value={active.length} accent="primary" />
-        <StatCard label="ถึงเป้าแล้ว" value={triggered.length} accent="warning" />
+    <div className="space-y-6 w-full min-w-0 max-w-6xl mx-auto">
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
+            <Bell size={24} className="text-primary" />
+            แจ้งเตือนราคา
+          </h2>
+          <p className="text-sm text-muted mt-1">
+            จัดการ alert ทั้งหมด — ตรวจอัตโนมัติทุก 1 นาที
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:min-w-[420px]">
+          <StatCard label="ทั้งหมด" value={alerts.length} />
+          <StatCard label="กำลังเฝ้า" value={active.length} accent="primary" />
+          <StatCard label="ถึงเป้าแล้ว" value={triggered.length} accent="warning" />
+        </div>
       </div>
 
       {triggered.length > 0 && (
@@ -124,12 +100,13 @@ export default function AlertsPage() {
         </section>
       )}
 
-      <form onSubmit={handleCreate} className="glass-card rounded-2xl p-5 space-y-4">
+      <form onSubmit={handleCreate} className="glass-card rounded-2xl p-5 lg:p-6 space-y-4">
         <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
           <Plus size={16} className="text-primary" />
           ตั้ง Alert ใหม่
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-3 lg:gap-4 lg:items-end">
           <div>
             <label className="text-[10px] font-bold text-muted uppercase">สัญลักษณ์</label>
             <input
@@ -138,7 +115,7 @@ export default function AlertsPage() {
               onChange={(e) => setForm({ ...form, symbol: e.target.value.toUpperCase() })}
               placeholder="AAPL, PTT.BK"
               required
-              className="w-full mt-1 bg-surface border border-border rounded-xl px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:border-primary"
+              className="w-full mt-1 bg-surface border border-border rounded-xl px-3 py-2.5 text-sm font-mono uppercase focus:outline-none focus:border-primary"
             />
           </div>
           <SelectField
@@ -157,27 +134,21 @@ export default function AlertsPage() {
               step="any"
               value={form.target_price}
               onChange={(e) => setForm({ ...form, target_price: e.target.value })}
-              placeholder={quotePrice ? String(quotePrice) : '150.00'}
+              placeholder="150.00"
               required
-              className="w-full mt-1 bg-surface border border-border rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary"
-            />
-            <AlertQuickSet
-              currentPrice={quotePrice}
-              currency={formCurrency}
-              direction={form.direction}
-              loading={quoteLoading && !!form.symbol.trim()}
-              onSelect={(price) => setForm({ ...form, target_price: price })}
+              className="w-full mt-1 bg-surface border border-border rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-primary"
             />
           </div>
           <button
             type="submit"
             disabled={saving}
-            className="py-2.5 bg-gradient-primary border border-primary rounded-xl text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full lg:w-auto lg:min-w-[140px] py-2.5 px-5 bg-gradient-primary border border-primary rounded-xl text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Bell size={14} />}
             ตั้ง Alert
           </button>
         </div>
+
         {error && <p className="text-xs text-danger">{error}</p>}
       </form>
 
@@ -212,14 +183,14 @@ export default function AlertsPage() {
       ) : (
         <div className="glass-card rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm lg:table-fixed">
               <thead>
-                <tr className="border-b border-border/40 text-[10px] text-muted uppercase">
-                  <th className="text-left py-3 px-4">หุ้น</th>
-                  <th className="text-left py-3 px-4">เงื่อนไข</th>
-                  <th className="text-right py-3 px-4">ราคาปัจจุบัน</th>
-                  <th className="text-center py-3 px-4">สถานะ</th>
-                  <th className="text-right py-3 px-4">จัดการ</th>
+                <tr className="border-b border-border/40 text-[10px] text-muted uppercase bg-surface/30">
+                  <th className="text-left py-3 px-4 lg:px-6 w-[14%]">หุ้น</th>
+                  <th className="text-left py-3 px-4 lg:px-6 w-[22%]">เงื่อนไข</th>
+                  <th className="text-right py-3 px-4 lg:px-6 w-[24%]">ราคาปัจจุบัน</th>
+                  <th className="text-center py-3 px-4 lg:px-6 w-[18%]">สถานะ</th>
+                  <th className="text-right py-3 px-4 lg:px-6 w-[12%]">จัดการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -238,9 +209,9 @@ export default function AlertsPage() {
 function StatCard({ label, value, accent }) {
   const color = accent === 'warning' ? 'text-warning' : accent === 'primary' ? 'text-primary' : 'text-foreground';
   return (
-    <div className="glass-card rounded-xl p-4 text-center">
-      <p className="text-[10px] text-muted uppercase">{label}</p>
-      <p className={`text-2xl font-black mt-1 ${color}`}>{value}</p>
+    <div className="glass-card rounded-xl px-3 py-2.5 lg:py-3 text-center min-w-0">
+      <p className="text-[10px] text-muted uppercase truncate">{label}</p>
+      <p className={`text-xl lg:text-2xl font-black mt-0.5 ${color}`}>{value}</p>
     </div>
   );
 }
@@ -296,22 +267,35 @@ function AlertRow({ alert: a, onDelete, deleting }) {
   const distance = a.current_price != null
     ? computeDistanceToTrigger(a.current_price, a.target_price, a.direction)
     : null;
+  const isUp = (a.change_percent ?? 0) >= 0;
+  const priceColor = a.change_percent != null
+    ? (isUp ? 'text-success' : 'text-danger')
+    : 'text-foreground';
 
   return (
     <tr className={`border-b border-border/30 hover:bg-surface/30 ${a.triggered ? 'bg-warning/5' : ''}`}>
-      <td className="py-3 px-4">
-        <Link to={`/stock/${a.symbol}`} className="font-mono font-bold hover:text-primary">
+      <td className="py-3.5 px-4 lg:px-6">
+        <Link to={`/stock/${a.symbol}`} className="font-mono font-bold text-base hover:text-primary">
           {a.symbol}
         </Link>
       </td>
-      <td className="py-3 px-4">
-        <span className="text-xs">{directionLabel(a.direction)}</span>
-        <p className="font-mono font-bold mt-0.5">
+      <td className="py-3.5 px-4 lg:px-6">
+        <span className="text-xs text-muted">{directionLabel(a.direction)}</span>
+        <p className="font-mono font-bold mt-0.5 text-sm">
           {directionSymbol(a.direction)} {formatMoney(a.target_price, cur)}
         </p>
       </td>
-      <td className="py-3 px-4 text-right font-mono">
-        {a.current_price != null ? formatMoney(a.current_price, cur) : '—'}
+      <td className="py-3.5 px-4 lg:px-6 text-right font-mono text-sm">
+        {a.current_price != null ? (
+          <>
+            <span className={`font-bold ${priceColor}`}>{formatMoney(a.current_price, cur)}</span>
+            {a.change_percent != null && (
+              <p className={`text-[10px] mt-0.5 font-semibold ${priceColor}`}>
+                {formatSignedPct(a.change_percent)}
+              </p>
+            )}
+          </>
+        ) : '—'}
         {distance && !a.triggered && (
           <p className={`text-[10px] mt-0.5 flex items-center justify-end gap-0.5 ${distanceColorClass(distance.pct, distance.atTarget)}`}>
             {distance.move === 'up' ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
@@ -319,7 +303,7 @@ function AlertRow({ alert: a, onDelete, deleting }) {
           </p>
         )}
       </td>
-      <td className="py-3 px-4 text-center">
+      <td className="py-3.5 px-4 lg:px-6 text-center">
         {a.triggered ? (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-warning/15 border border-warning/30 text-warning text-[10px] font-bold">
             <BellRing size={10} /> ถึงแล้ว
@@ -330,7 +314,7 @@ function AlertRow({ alert: a, onDelete, deleting }) {
           </span>
         )}
       </td>
-      <td className="py-3 px-4 text-right">
+      <td className="py-3.5 px-4 lg:px-6 text-right">
         <button
           type="button"
           onClick={() => onDelete(a.id, a.symbol)}
