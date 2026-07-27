@@ -352,6 +352,10 @@ def get_stock_quote(symbol: str) -> Optional[StockQuote]:
 
         extended = _extended_session(info, market_state, prev_close or price)
 
+        day_open = _optional_quote_float(info.get("regularMarketOpen") or info.get("open"))
+        day_high = _optional_quote_float(info.get("regularMarketDayHigh") or info.get("dayHigh"))
+        day_low = _optional_quote_float(info.get("regularMarketDayLow") or info.get("dayLow"))
+
         quote = StockQuote(
             symbol=cleaned,
             name=info.get("shortName") or info.get("longName") or cleaned,
@@ -364,6 +368,9 @@ def get_stock_quote(symbol: str) -> Optional[StockQuote]:
             market_state=market_state,
             exchange_timezone=exchange_timezone,
             fetched_at=fetched_at,
+            day_open=day_open,
+            day_high=day_high,
+            day_low=day_low,
             **extended,
         )
         quote_cache[cleaned] = {"timestamp": now, "data": quote}

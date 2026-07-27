@@ -4,6 +4,7 @@ import { Search, Globe, ArrowUpRight, ArrowDownRight, TrendingUp } from 'lucide-
 import { api, POPULAR_STOCKS } from '../api';
 import { useQuotePoll, HOME_POLL_MS } from '../hooks/useQuotePoll';
 import StarButton from '../components/StarButton';
+import MarketStateBadge from '../components/MarketStateBadge';
 import MarketSignalSections from '../components/MarketSignalSections';
 import QuickCompareSection from '../components/QuickCompareSection';
 import RecentStocksSection from '../components/RecentStocksSection';
@@ -132,7 +133,10 @@ function StockCard({ symbol, name, market }) {
       className="glass-card rounded-2xl p-4 group flex flex-col min-h-[120px]"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="text-[10px] font-mono text-muted bg-surface px-1.5 py-0.5 rounded border border-border shrink-0">{market}</span>
+        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+          <span className="text-[10px] font-mono text-muted bg-surface px-1.5 py-0.5 rounded border border-border shrink-0">{market}</span>
+          {quote?.market_state && <MarketStateBadge marketState={quote.market_state} compact />}
+        </div>
         {quote && (
           <span className={`text-[10px] font-bold flex items-center shrink-0 ${isUp ? 'text-success' : 'text-danger'}`}>
             {isUp ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}

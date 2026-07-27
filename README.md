@@ -15,12 +15,19 @@
   - Auto-refresh ทุก **1 นาที** — กดปุ่มรีเฟรชเพื่อบังคับสแกนใหม่
 - **เปรียบเทียบด่วน** — preset 23 หมวด
 - ราคาการ์ด / ดูล่าสุด อัปเดตอัตโนมัติทุก **1 นาที**
+- **สถานะตลาด** — badge ต่อหุ้น (จุดเขียวกระพริบ = ตลาดเปิด, ส้ม = ก่อนตลาดเปิด, เทา = ปิด)
 
 ### หน้าหุ้น (`/stock/:symbol`)
 - ราคา, ข้อมูลบริษัท, กราฟแท่งเทียน (Lightweight Charts)
+- **สถานะตลาด & ราคานอกเวลา**
+  - ราคาหลัก = ราคาช่วงตลาดเปิด (`regularMarketPrice`)
+  - ราคา **ก่อนตลาดเปิด** แสดง inline ข้างราคาหลัก (pre/post จาก Yahoo — ใช้ป้าย **"ก่อนตลาดเปิด"** ทั้ง pre และ post)
+  - ตอน **ตลาดเปิด** — กริด **เปิดวัน / สูงสุด / ต่ำสุด** (`day_open`, `day_high`, `day_low`)
+  - Badge **ตลาดเปิด** (จุดเขียวกระพริบ) ข้าง symbol
+- **ช่วงราคาตามกราฟ** — ต่ำสุด/สูงสุดคำนวณจากแท่งเทียนที่เลือก (dropdown ช่วงเวลา + แท่งเทียน) พร้อมแถบตำแหน่งราคาปัจจุบัน
 - **กราฟเทคนิคอัตโนมัติ** — EMA 9/21/50, RSI, MACD, Support/Resistance, ป้ายเทรนด์ (hover `?` อธิบายคำศัพท์)
 - กราฟปรับขนาดบนมือถือ (แผน RSI/MACD เล็กลง)
-- **Valuation** — P/E, PEG, P/S, P/B, ROE, radar chart, งบรายไตรมาส, ประวัติ P/E
+- **Valuation** — P/E, PEG, P/S, P/B, ROE, score ring + radar chart (ขนาดเท่ากัน), งบรายไตรมาส, ประวัติ P/E
 - **เงินปันผล** — ประวัติงวด, ประมาณการ/ปี, Div Yield
 - **Trading Plan** — คำแนะนำซื้อ/ถือ/ขาย, stop loss, target, position sizing, DCA
 - สลับโหมด **"ถืออยู่แล้ว" / "ยังไม่ได้ซื้อ"** สำหรับคำแนะนำที่ต่างกัน
@@ -31,8 +38,8 @@
 
 ### พอร์ต (`/portfolio`)
 - บันทึกหุ้นที่ถือ: **สัญลักษณ์ + จำนวน + ราคาซื้อเฉลี่ย**
-- แสดงมูลค่าปัจจุบัน, กำไร/ขาดทุน unrealized (%)
-- **Dashboard** — pie chart สัดส่วนตามหุ้น, bar chart ตาม sector, การ์ดกำไร/ขาดทุนสูงสุด
+- แสดงมูลค่าปัจจุบัน, กำไร/ขาดทุน unrealized — **แสดงสกุลเงินและ %** ครบ (การ์ดสรุป + ตาราง)
+- **Dashboard** — pie chart สัดส่วนตามหุ้น, bar chart ตาม sector, การ์ดกำไร/ขาดทุนสูงสุด (%, จำนวนเงิน)
 - **Price Alert** ต่อหุ้น + แบนเนอร์แจ้งเตือนที่ trigger แล้ว
 - แก้ไข / ลบรายการ — ราคาอัปเดต auto ทุก **1 นาที**
 
@@ -45,6 +52,7 @@
 
 ### รายการโปรด (`/favorites`)
 - หุ้นที่บันทึกไว้ พร้อมราคาอัปเดตอัตโนมัติทุก **1 นาที**
+- ราคาแสดงสกุลเงิน + **badge สถานะตลาด** ต่อหุ้น
 - **Price Alert** ต่อหุ้น (ปุ่ม 🔔 บนการ์ด)
 
 ### แจ้งเตือนราคา (`/alerts`)
@@ -72,10 +80,12 @@
 ### Price Alerts
 - ตั้งเงื่อนไข **ราคา ≥ เป้า** หรือ **ราคา ≤ เป้า**
 - ตรวจอัตโนมัติทุก **1 นาที** — แสดง badge เมื่อ trigger
+- **เสียง chime** เมื่อมี alert trigger ใหม่ (ขณะเปิดเว็บ)
 - ไม่ส่ง push/email — ต้องเปิดเว็บเพื่อดู
 
 ### UI / UX
 - Dark/Light theme (toggle มุมขวาบน — รวมหน้า login/register)
+- **ฟอร์แมตราคา/สกุลเงิน** — `formatMoney`, `formatPnl` ใช้ทั่วระบบ (หน้าหุ้น, พอร์ต, alerts, compare)
 - พื้นหลัง 3D (Three.js) แบบ full-screen หลังแอปหลัก
 - Logo + favicon แบบ candlestick (SVG)
 - Custom **SelectField** dropdown และ **SegmentedControl** ทั้งระบบ
@@ -179,6 +189,8 @@ stock-analyzer/
         ├── utils/
         │   ├── recentStocks.js
         │   ├── chartIndicators.js
+        │   ├── chartPriceRange.js   # min/max จาก history ตาม period/interval
+        │   ├── alertSound.js
         │   └── glossary.js
         ├── context/
         ├── pages/
@@ -201,6 +213,9 @@ stock-analyzer/
             ├── MarketSignalSections.jsx
             ├── PortfolioDashboard.jsx
             ├── PriceAlertButton.jsx
+            ├── PriceRangeGrid.jsx      # ช่วงราคาต่ำ/สูงตามกราฟ
+            ├── MarketStateBadge.jsx    # badge สถานะตลาด (เปิด/ปิด/ก่อนตลาดเปิด)
+            ├── DayQuoteStats.jsx       # เปิดวัน / สูง / ต่ำ ตอนตลาดเปิด
             ├── RecentStocksSection.jsx
             ├── DividendPanel.jsx
             ├── PasswordInput.jsx
@@ -389,7 +404,7 @@ docker compose up -d   # restart backend — ไม่ต้อง rebuild front
 
 | Method | Path | คำอธิบาย |
 |--------|------|----------|
-| GET | `/api/stock/quote?symbol=` | ราคาปัจจุบัน + `market_time` + `fetched_at` |
+| GET | `/api/stock/quote?symbol=` | ราคา + `market_state` + extended hours + เปิด/สูง/ต่ำวัน + `fetched_at` |
 | GET | `/api/stock/info?symbol=` | ข้อมูลบริษัท + dividends |
 | GET | `/api/stock/history?symbol=&period=&interval=` | OHLCV |
 | GET | `/api/stock/search?q=` | ค้นหาสัญลักษณ์ |
@@ -419,7 +434,25 @@ docker compose up -d   # restart backend — ไม่ต้อง rebuild front
 
 - กลับมาแท็บเบราว์เซอร์ → ดึงข้อมูลทันที
 - `market_time` = เวลาซื้อขายล่าสุดจาก Yahoo (อาจไม่เปลี่ยนเมื่อตลาดปิด)
+- `market_state` = สถานะตลาดจาก Yahoo (`REGULAR`, `PRE`, `POST`, `CLOSED`, …)
 - `fetched_at` = เวลาที่ backend ดึงจาก Yahoo ล่าสุด
+
+### สถานะตลาด & ราคา (StockQuote)
+
+| สถานะ | ความหมาย | UI |
+|--------|----------|-----|
+| `REGULAR` | ตลาดเปิด | จุดเขียวกระพริบ + กริด เปิดวัน/สูง/ต่ำ |
+| `PRE` / `POST` | ก่อนตลาดเปิด / หลังปิด | ราคา extended inline + ป้าย "ก่อนตลาดเปิด" |
+| `CLOSED` | ตลาดปิด | ราคาปิดวัน — อาจมี post-market ค้าง |
+
+ฟิลด์ quote ที่เกี่ยวข้อง:
+
+| ฟิลด์ | คำอธิบาย |
+|-------|----------|
+| `price`, `change`, `change_percent` | ราคาหลักช่วง regular |
+| `pre_market_*`, `post_market_*` | ราคานอกเวลา |
+| `day_open`, `day_high`, `day_low` | เปิด/สูง/ต่ำของวัน (ตอนตลาดเปิด) |
+| `market_time`, `market_state`, `exchange_timezone` | เวลาและสถานะตลาด |
 
 ### Backend cache (TTL **1 นาที**)
 

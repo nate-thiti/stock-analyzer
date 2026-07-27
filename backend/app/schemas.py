@@ -19,6 +19,9 @@ class StockQuote(BaseModel):
     post_market_price: Optional[float] = None
     post_market_change: Optional[float] = None
     post_market_change_percent: Optional[float] = None
+    day_open: Optional[float] = None
+    day_high: Optional[float] = None
+    day_low: Optional[float] = None
 
 class StockHistoryItem(BaseModel):
     time: str

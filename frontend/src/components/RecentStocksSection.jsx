@@ -4,6 +4,7 @@ import { History, ArrowUpRight, ArrowDownRight, X } from 'lucide-react';
 import { api } from '../api';
 import { getRecentStocks, removeRecentStock } from '../utils/recentStocks';
 import { useQuotePoll, HOME_POLL_MS } from '../hooks/useQuotePoll';
+import MarketStateBadge from './MarketStateBadge';
 
 export default function RecentStocksSection() {
   const [symbols, setSymbols] = useState(getRecentStocks());
@@ -60,7 +61,10 @@ function RecentChip({ symbol, onRemove }) {
         to={`/stock/${symbol}`}
         className="block glass-card rounded-xl px-4 py-3 pr-8 hover:border-primary/40 transition-colors"
       >
-        <p className="font-mono font-bold text-sm">{symbol}</p>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p className="font-mono font-bold text-sm">{symbol}</p>
+          {quote?.market_state && <MarketStateBadge marketState={quote.market_state} compact />}
+        </div>
         {quote ? (
           <>
             <p className="text-lg font-black mt-1">

@@ -6,6 +6,7 @@ import { useFavorites } from '../context/FavoritesContext';
 import { useQuotePoll } from '../hooks/useQuotePoll';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import PriceAlertButton, { AlertTriggeredBadge } from '../components/PriceAlertButton';
+import MarketStateBadge from '../components/MarketStateBadge';
 
 export default function FavoritesPage() {
   const { favorites, loading: favLoading } = useFavorites();
@@ -84,7 +85,10 @@ function FavoriteCard({ symbol, alerts, onAlertChange }) {
       </div>
 
       <Link to={`/stock/${symbol}`} className="block">
-        <p className="font-mono font-black text-xl text-foreground pr-20">{symbol}</p>
+        <div className="flex flex-wrap items-center gap-2 pr-20">
+          <p className="font-mono font-black text-xl text-foreground">{symbol}</p>
+          {quote?.market_state && <MarketStateBadge marketState={quote.market_state} compact />}
+        </div>
         {hasTriggered && <div className="mt-1"><AlertTriggeredBadge show /></div>}
         {quote?.name && <p className="text-xs text-muted truncate mt-0.5">{quote.name}</p>}
 

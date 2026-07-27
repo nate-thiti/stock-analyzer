@@ -12,34 +12,34 @@ const POSITION_GUIDANCE = {
   holding: {
     buy: {
       label: 'ถือต่อ / สะสมเพิ่ม',
-      hint: 'สัญญาณบวก — ถือต่อได้ หรือเพิ่มสัดส่วนตามแผน DCA ด้านล่าง',
+      hint: 'สัญญาณรวมเป็นบวก — ถือต่อได้ตามแผน หรือเพิ่มทีละน้อยตาม DCA ด้านล่าง อย่าลงครั้งเดียวเกินสัดส่วนที่คำนวณ',
       style: 'buy',
     },
     sell: {
       label: 'พิจารณาขาย',
-      hint: 'สัญญาณลบ — ควรลดสัดส่วน หรือ take profit บางส่วนใกล้ resistance',
+      hint: 'สัญญาณกดดัน — ควร take profit บางส่วนหรือลดสัดส่วนเมื่อราคาใกล้แนวต้าน ตั้ง stop loss ให้ล็อกกำไร',
       style: 'sell',
     },
     hold: {
       label: 'ถือต่อ',
-      hint: 'ยังไม่ชัดเจนพอ — ถือต่อได้ แต่ไม่จำเป็นต้องเพิ่ม',
+      hint: 'สัญญาณยังไม่ชัด — ถือต่อได้ แต่ยังไม่จำเป็นต้องเพิ่ม รอ breakout หรือ pullback ใกล้แนวรับก่อน',
       style: 'hold',
     },
   },
   new: {
     buy: {
       label: 'ซื้อได้',
-      hint: 'สัญญาณบวก — เหมาะเริ่มเข้าตามแผน DCA ด้านล่าง',
+      hint: 'สัญญาณบวก — เหมาะเริ่มเข้าตามแผน DCA แบ่ง 3 งวด ไม่ all-in ครั้งเดียว และตั้ง stop loss ตามแผน',
       style: 'buy',
     },
     sell: {
       label: 'อย่าเข้า / รอ',
-      hint: 'สัญญาณลบ — ยังไม่เหมาะเปิดสถานะใหม่ รอสัญญาณดีขึ้น',
+      hint: 'สัญญาณลบ — ยังไม่เหมาะเปิดสถานะใหม่ รอจน score ดีขึ้นหรือราคาปรับตัวใกล้แนวรับ',
       style: 'hold',
     },
     hold: {
       label: 'รอดูก่อน',
-      hint: 'ยังไม่ชัดเจน — รอราคาใกล้ support หรือ breakout ยืนยันก่อนเข้า',
+      hint: 'ยังไม่ชัดเจน — รอราคาใกล้แนวรับหรือ breakout ยืนยันก่อนเข้า อย่ารีบตามราคา',
       style: 'hold',
     },
   },
@@ -98,14 +98,20 @@ function getContextualDca(plan, positionMode) {
 function NoteList({ title, items, color = 'primary' }) {
   if (!items?.length) return null;
   const dot = color === 'success' ? 'bg-success' : color === 'warning' ? 'bg-warning' : 'bg-primary';
+  const introBg = color === 'success' ? 'bg-success/5 border-success/20' : color === 'warning' ? 'bg-warning/5 border-warning/20' : 'bg-primary/5 border-primary/20';
   return (
     <div>
       <h4 className="text-[10px] font-bold text-muted uppercase mb-2">{title}</h4>
-      <ul className="space-y-1.5">
+      <ul className="space-y-2">
         {items.map((r, i) => (
-          <li key={i} className="text-[11px] text-foreground/85 flex items-start gap-2 leading-relaxed">
-            <span className={`w-1 h-1 rounded-full ${dot} mt-1.5 shrink-0`} />
-            {r}
+          <li
+            key={i}
+            className={`text-[11px] text-foreground/85 flex items-start gap-2 leading-relaxed ${
+              i === 0 ? `p-2.5 rounded-lg border ${introBg} font-medium` : ''
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${dot} mt-1.5 shrink-0`} />
+            <span>{r}</span>
           </li>
         ))}
       </ul>
@@ -211,8 +217,10 @@ export default function TradingPlanPanel({ plan, currency, embedded = false, pos
           <h4 className="text-[10px] font-bold text-primary uppercase mb-2 flex items-center gap-1">
             <AlertCircle size={11} /> บทวิเคราะห์โดยสรุป
           </h4>
-          <div className="text-[11px] text-foreground/85 leading-relaxed space-y-2 whitespace-pre-line">
-            {plan.detailed_analysis}
+          <div className="text-[11px] text-foreground/85 leading-relaxed space-y-3 whitespace-pre-line">
+            {plan.detailed_analysis.split('\n\n').map((para, i) => (
+              <p key={i} className={i === 0 ? 'font-medium text-foreground/90' : ''}>{para}</p>
+            ))}
           </div>
         </div>
       )}

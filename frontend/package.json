@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "node scripts/generate-redirects.mjs && vite build",
     "lint": "oxlint",
-    "test": "node --test src/utils/chartIndicators.test.js",
+    "test": "node --test src/utils/chartIndicators.test.js src/utils/priceAlert.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

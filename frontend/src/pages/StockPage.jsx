@@ -4,7 +4,7 @@ import {
   ArrowUpRight, ArrowDownRight, AlertTriangle, Building2,
   GitCompare, Info, BarChart3, Percent, Coins, Layers, Loader2, Clock, Radio, Briefcase,
 } from 'lucide-react';
-import { api, formatHistoryDate, formatMarketCap, formatMarketTime, formatFetchedAt, formatPct, formatMoney, formatPnl, EXTENDED_HOURS_LABEL } from '../api';
+import { api, formatHistoryDate, formatMarketCap, formatMarketTime, formatFetchedAt, formatPct, formatMoney, formatPnl, EXTENDED_HOURS_LABEL, isMarketRegular } from '../api';
 import { useQuotePoll, ANALYSIS_POLL_MS } from '../hooks/useQuotePoll';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import { addRecentStock } from '../utils/recentStocks';
@@ -14,6 +14,8 @@ import ValuationPanel from '../components/valuation/ValuationPanel';
 import PriceAlertButton from '../components/PriceAlertButton';
 import DividendPanel from '../components/DividendPanel';
 import PriceRangeGrid from '../components/PriceRangeGrid';
+import MarketStateBadge from '../components/MarketStateBadge';
+import DayQuoteStats from '../components/DayQuoteStats';
 import SelectField from '../components/SelectField';
 import { computeHistoryPriceRange, formatChartRangeLabel } from '../utils/chartPriceRange';
 
@@ -237,6 +239,7 @@ export default function StockPage() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
                     <h2 className="text-xl sm:text-2xl font-black text-foreground">{quote.symbol}</h2>
+                    {quote.market_state && <MarketStateBadge marketState={quote.market_state} />}
                     <StarButton symbol={quote.symbol} />
                     <PriceAlertButton
                       symbol={quote.symbol}
@@ -266,6 +269,14 @@ export default function StockPage() {
                       </>
                     )}
                   </div>
+                  {isMarketRegular(quote.market_state) && (
+                    <DayQuoteStats
+                      open={quote.day_open}
+                      high={quote.day_high}
+                      low={quote.day_low}
+                      currency={currency}
+                    />
+                  )}
                   {!quote.pre_market_price && !quote.post_market_price
                     && !quote.symbol.includes('.')
                     && ['CLOSED', 'PREPRE', 'POSTPOST'].includes(quote.market_state) && (
@@ -290,9 +301,7 @@ export default function StockPage() {
                           )}
                         </span>
                         {marketUpdate.state && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-surface border border-border/50 text-[10px]">
-                            {marketUpdate.state}
-                          </span>
+                          <MarketStateBadge marketState={quote.market_state} compact />
                         )}
                       </p>
                       <p className="flex items-center gap-1.5 flex-wrap pl-[18px]">

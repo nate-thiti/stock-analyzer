@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Bell, BellRing, Loader2, Trash2, Plus, ArrowUpRight, ArrowDownRight,
-  TrendingUp, TrendingDown, ExternalLink,
+  Bell, BellRing, Loader2, Trash2, Plus,
+  TrendingUp, TrendingDown, ExternalLink, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { api, inferCurrency, formatMoney, formatSignedMoney } from '../api';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import SelectField from '../components/SelectField';
 import SegmentedControl from '../components/SegmentedControl';
+import AlertQuickSet from '../components/AlertQuickSet';
+import { computeDistanceToTrigger, distanceColorClass } from '../utils/priceAlert';
 
 function directionLabel(direction) {
   return direction === 'above' ? 'ราคา ≥ เป้า' : 'ราคา ≤ เป้า';
@@ -24,6 +26,30 @@ export default function AlertsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [quotePrice, setQuotePrice] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+
+  useEffect(() => {
+    const sym = form.symbol.trim().toUpperCase();
+    if (!sym) {
+      setQuotePrice(null);
+      return undefined;
+    }
+    const timer = setTimeout(async () => {
+      setQuoteLoading(true);
+      try {
+        const q = await api.quote(sym);
+        setQuotePrice(q?.price ?? null);
+      } catch {
+        setQuotePrice(null);
+      } finally {
+        setQuoteLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [form.symbol]);
+
+  const formCurrency = inferCurrency(form.symbol.trim());
 
   const active = alerts.filter((a) => !a.triggered);
 
@@ -131,9 +157,16 @@ export default function AlertsPage() {
               step="any"
               value={form.target_price}
               onChange={(e) => setForm({ ...form, target_price: e.target.value })}
-              placeholder="150.00"
+              placeholder={quotePrice ? String(quotePrice) : '150.00'}
               required
               className="w-full mt-1 bg-surface border border-border rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary"
+            />
+            <AlertQuickSet
+              currentPrice={quotePrice}
+              currency={formCurrency}
+              direction={form.direction}
+              loading={quoteLoading && !!form.symbol.trim()}
+              onSelect={(price) => setForm({ ...form, target_price: price })}
             />
           </div>
           <button
@@ -260,8 +293,8 @@ function NotificationRow({ alert: a, onDelete, deleting }) {
 
 function AlertRow({ alert: a, onDelete, deleting }) {
   const cur = inferCurrency(a.symbol);
-  const pctToTarget = a.current_price != null && a.target_price
-    ? ((a.current_price - a.target_price) / a.target_price) * 100
+  const distance = a.current_price != null
+    ? computeDistanceToTrigger(a.current_price, a.target_price, a.direction)
     : null;
 
   return (
@@ -279,10 +312,10 @@ function AlertRow({ alert: a, onDelete, deleting }) {
       </td>
       <td className="py-3 px-4 text-right font-mono">
         {a.current_price != null ? formatMoney(a.current_price, cur) : '—'}
-        {pctToTarget != null && !a.triggered && (
-          <p className={`text-[10px] mt-0.5 flex items-center justify-end gap-0.5 ${pctToTarget >= 0 ? 'text-success' : 'text-danger'}`}>
-            {pctToTarget >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
-            {Math.abs(pctToTarget).toFixed(1)}% จากเป้า
+        {distance && !a.triggered && (
+          <p className={`text-[10px] mt-0.5 flex items-center justify-end gap-0.5 ${distanceColorClass(distance.pct, distance.atTarget)}`}>
+            {distance.move === 'up' ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
+            {distance.label}
           </p>
         )}
       </td>

@@ -3,6 +3,8 @@ import { Bell, BellRing, Loader2 } from 'lucide-react';
 import { api, inferCurrency, formatMoney } from '../api';
 import Modal from './Modal';
 import SelectField from './SelectField';
+import AlertQuickSet from './AlertQuickSet';
+import { computeDistanceToTrigger, distanceColorClass } from '../utils/priceAlert';
 
 export default function PriceAlertButton({ symbol, currentPrice, currency, alerts = [], onChange, compact = false }) {
   const [open, setOpen] = useState(false);
@@ -109,6 +111,12 @@ export default function PriceAlertButton({ symbol, currentPrice, currency, alert
               autoFocus
               className="w-full mt-1 bg-surface border border-border rounded-xl px-3 py-2 text-sm font-mono"
             />
+            <AlertQuickSet
+              currentPrice={currentPrice}
+              currency={cur}
+              direction={direction}
+              onSelect={setTarget}
+            />
           </div>
           {error && <p className="text-xs text-danger">{error}</p>}
           <button
@@ -124,7 +132,11 @@ export default function PriceAlertButton({ symbol, currentPrice, currency, alert
         {symbolAlerts.length > 0 && (
           <div className="border-t border-border/40 pt-3 space-y-2">
             <p className="text-[10px] font-bold text-muted uppercase">Alert ที่ตั้งไว้</p>
-            {symbolAlerts.map((a) => (
+            {symbolAlerts.map((a) => {
+              const distance = a.current_price != null
+                ? computeDistanceToTrigger(a.current_price, a.target_price, a.direction)
+                : null;
+              return (
               <div
                 key={a.id}
                 className={`flex items-center justify-between text-xs rounded-lg px-3 py-2 ${a.triggered ? 'bg-warning/10 border border-warning/30' : 'bg-surface/50'}`}
@@ -132,10 +144,15 @@ export default function PriceAlertButton({ symbol, currentPrice, currency, alert
                 <span>
                   {a.direction === 'above' ? '≥' : '≤'} {formatMoney(a.target_price, cur)}
                   {a.triggered && <span className="ml-2 text-warning font-bold">ถึงแล้ว!</span>}
+                  {distance && !a.triggered && (
+                    <span className={`ml-2 ${distanceColorClass(distance.pct, distance.atTarget)}`}>
+                      {distance.label}
+                    </span>
+                  )}
                 </span>
                 <button type="button" onClick={() => handleDelete(a.id)} className="text-danger hover:underline">ลบ</button>
               </div>
-            ))}
+            );})}
           </div>
         )}
       </Modal>

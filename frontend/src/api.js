@@ -232,6 +232,14 @@ const MARKET_STATE_LABELS = {
   POSTPOST: 'ตลาดปิด',
 };
 
+export function getMarketStateLabel(marketState) {
+  return MARKET_STATE_LABELS[marketState] || marketState || null;
+}
+
+export function isMarketRegular(marketState) {
+  return marketState === 'REGULAR';
+}
+
 export function formatMarketTime(iso, timezone, marketState) {
   if (!iso) return { time: '-', state: null };
   const date = new Date(iso);
