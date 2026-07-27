@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Activity, Target, Wallet, Layers, Calendar, AlertCircle, Package, ShoppingCart } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Shield, Target, Wallet, Layers, Calendar, AlertCircle, Package, ShoppingCart } from 'lucide-react';
 import { ACTION_STYLES, formatMoney, formatPnl } from '../api';
 import PersonalRiskPanel from './PersonalRiskPanel';
 
