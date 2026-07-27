@@ -13,7 +13,7 @@ function TrendBadge({ label, value }) {
     : value?.includes('down') || value === 'decreasing' ? 'text-danger' : 'text-warning';
   return (
     <div className="text-center bg-surface/40 rounded-xl py-2">
-      <p className="text-[10px] text-muted uppercase">{label}</p>
+      <p className="text-xs text-muted uppercase">{label}</p>
       <p className={`text-xs font-bold mt-1 ${color}`}>{value?.replace('_', ' ').toUpperCase()}</p>
     </div>
   );
@@ -37,11 +37,11 @@ export default function ValuationPanel({
   return (
     <div className="glass-card rounded-2xl p-4 sm:p-6 lg:p-8 animate-fadeIn min-w-0">
       <div className="flex items-center justify-between gap-4 mb-6 pb-4 border-b border-border/40">
-        <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+        <h3 className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
           <span className="w-1.5 h-5 bg-gradient-primary rounded-full" />
           ตัวชี้วัดมูลค่า & แผนลงทุน
         </h3>
-        <p className="text-[10px] text-muted hidden sm:block">อ่านกราฟพร้อมสรุปคำแนะนำ — ไม่ต้องเลื่อนหา</p>
+        <p className="text-xs text-muted hidden sm:block">อ่านกราฟพร้อมสรุปคำแนะนำ — ไม่ต้องเลื่อนหา</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 xl:gap-8 items-start">
@@ -49,7 +49,7 @@ export default function ValuationPanel({
         <div className="space-y-8 min-w-0 order-last xl:order-none">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center max-w-lg sm:max-w-none">
             <div className="flex flex-col items-center min-w-0">
-              <p className="text-[10px] text-muted font-bold uppercase mb-2">Valuation Score</p>
+              <p className="text-xs text-muted font-bold uppercase mb-2">Valuation Score</p>
               <ValuationScoreRing
                 grade={fundamental.valuation_grade}
                 pe={fundamental.pe_ratio}
@@ -57,13 +57,13 @@ export default function ValuationPanel({
               />
             </div>
             <div className="flex flex-col items-center min-w-0">
-              <p className="text-[10px] text-muted font-bold uppercase mb-2">Radar Profile</p>
+              <p className="text-xs text-muted font-bold uppercase mb-2">Radar Profile</p>
               <ValuationRadar fundamental={fundamental} large />
             </div>
           </div>
 
           <div>
-            <p className="text-[10px] text-muted font-bold uppercase mb-3">Benchmark vs มาตรฐาน</p>
+            <p className="text-xs text-muted font-bold uppercase mb-3">Benchmark vs มาตรฐาน</p>
             <ValuationMetricBars fundamental={fundamental} />
           </div>
 
@@ -130,11 +130,11 @@ function MiniStat({ label, value, pct, hint, tip }) {
     : typeof value === 'number' ? value.toFixed(2) : value;
   return (
     <div className="bg-surface/60 p-3 rounded-xl border border-border/50 text-center">
-      <p className="text-[10px] text-muted font-bold uppercase flex items-center justify-center gap-0.5">
+      <p className="text-xs text-muted font-bold uppercase flex items-center justify-center gap-0.5">
         <InfoTip term={tip} label={label} />
       </p>
       <p className="text-sm font-mono font-bold text-foreground mt-1">{display}</p>
-      {hint && <p className="text-[9px] text-muted">{hint}</p>}
+      {hint && <p className="text-xs text-muted">{hint}</p>}
     </div>
   );
 }

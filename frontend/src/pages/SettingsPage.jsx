@@ -11,7 +11,7 @@ export default function SettingsPage() {
   return (
     <div className="max-w-xl mx-auto space-y-6">
       <div>
-        <h1 className="text-xl font-black text-foreground flex items-center gap-2">
+        <h1 className="text-2xl sm:text-3xl font-black text-foreground flex items-center gap-2">
           <Settings size={20} className="text-primary" />
           ตั้งค่า
         </h1>
@@ -27,29 +27,29 @@ export default function SettingsPage() {
         {profile?.configured ? (
           <dl className="grid grid-cols-2 gap-3 text-xs">
             <div className="bg-surface/50 p-3 rounded-xl border border-border/40">
-              <dt className="text-muted text-[10px] uppercase">ขาดทุนสูงสุด/หุ้น</dt>
+              <dt className="text-muted text-xs uppercase">ขาดทุนสูงสุด/หุ้น</dt>
               <dd className="font-bold text-lg mt-0.5">{profile.max_loss_tolerance_pct}%</dd>
-              <dd className="text-[10px] text-muted">{riskToleranceLabel(profile.max_loss_tolerance_pct)}</dd>
+              <dd className="text-xs text-muted">{riskToleranceLabel(profile.max_loss_tolerance_pct)}</dd>
             </div>
             <div className="bg-surface/50 p-3 rounded-xl border border-border/40">
-              <dt className="text-muted text-[10px] uppercase">เพดานสัดส่วน/หุ้น</dt>
+              <dt className="text-muted text-xs uppercase">เพดานสัดส่วน/หุ้น</dt>
               <dd className="font-bold text-lg mt-0.5">{profile.max_position_pct}%</dd>
             </div>
             <div className="bg-surface/50 p-3 rounded-xl border border-border/40 col-span-2">
-              <dt className="text-muted text-[10px] uppercase">มูลค่าพอร์ต (จากที่บันทึก)</dt>
+              <dt className="text-muted text-xs uppercase">มูลค่าพอร์ต (จากที่บันทึก)</dt>
               <dd className="font-bold mt-0.5">
                 {profile.portfolio_from_positions
                   ? formatMoney(profile.portfolio_value, null, { compact: true })
                   : 'ยังไม่มีหุ้น — ใช้ค่าเริ่มต้น'}
               </dd>
               {profile.portfolio_from_positions && (
-                <dd className="text-[10px] text-muted mt-0.5">
+                <dd className="text-xs text-muted mt-0.5">
                   ใช้คำนวณขนาดสถานะและสัดส่วนอัตโนมัติ
                 </dd>
               )}
             </div>
             <div className="bg-surface/50 p-3 rounded-xl border border-border/40">
-              <dt className="text-muted text-[10px] uppercase">เสี่ยงต่อเทรด</dt>
+              <dt className="text-muted text-xs uppercase">เสี่ยงต่อเทรด</dt>
               <dd className="font-bold mt-0.5">{profile.risk_per_trade_pct}%</dd>
             </div>
           </dl>

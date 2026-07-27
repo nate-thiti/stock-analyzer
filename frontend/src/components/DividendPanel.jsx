@@ -128,7 +128,7 @@ function DividendBarChart({ dividends, currency }) {
         )}
       </svg>
 
-      <div className="flex gap-4 text-[10px] text-muted justify-center mt-1">
+      <div className="flex gap-4 text-xs text-muted justify-center mt-1">
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm bg-success/75" /> เงินปันผล/งวด
         </span>
@@ -175,22 +175,22 @@ export default function DividendPanel({ dividends = [], annualDividend, dividend
 
       {sorted.length > 0 && (
         <div className="mb-4">
-          <p className="text-[10px] font-bold text-muted uppercase mb-2">ประวัติเงินปันผล</p>
+          <p className="text-xs font-bold text-muted uppercase mb-2">ประวัติเงินปันผล</p>
           <DividendBarChart dividends={sorted} currency={currency} />
         </div>
       )}
 
       {sorted.length > 0 && (
         <details className="group">
-          <summary className="text-[10px] font-bold text-muted uppercase cursor-pointer hover:text-primary transition-colors">
+          <summary className="text-xs font-bold text-muted uppercase cursor-pointer hover:text-primary transition-colors">
             ตารางรายละเอียด ({sorted.length} งวด)
           </summary>
           <div className="overflow-x-auto mt-3 max-h-48 overflow-y-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border/40 text-muted sticky top-0 bg-card/90">
-                  <th className="text-left py-2 pr-4 font-bold uppercase text-[10px]">Ex-Date</th>
-                  <th className="text-right py-2 font-bold uppercase text-[10px]">จำนวน ({currency})</th>
+                  <th className="text-left py-2 pr-4 font-bold uppercase text-xs">Ex-Date</th>
+                  <th className="text-right py-2 font-bold uppercase text-xs">จำนวน ({currency})</th>
                 </tr>
               </thead>
               <tbody>
@@ -212,7 +212,7 @@ export default function DividendPanel({ dividends = [], annualDividend, dividend
 function Stat({ label, value }) {
   return (
     <div className="bg-surface/40 p-3 rounded-xl border border-border/30">
-      <p className="text-[10px] text-muted uppercase">{label}</p>
+      <p className="text-xs text-muted uppercase">{label}</p>
       <p className="text-sm font-bold mt-0.5">{value}</p>
     </div>
   );

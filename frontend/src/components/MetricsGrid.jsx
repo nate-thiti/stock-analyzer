@@ -28,9 +28,9 @@ export default function MetricsGrid({ fundamental, technical, trend }) {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {metrics.map((m) => (
           <div key={m.label} className="bg-surface/60 p-3 rounded-xl border border-border/50 hover:border-primary/30 transition-colors">
-            <p className="text-[10px] text-muted font-bold uppercase">{m.label}</p>
+            <p className="text-xs text-muted font-bold uppercase">{m.label}</p>
             <p className={`text-sm font-mono font-bold mt-1 ${m.color || 'text-foreground'}`}>{m.value || '-'}</p>
-            {m.hint && <p className="text-[9px] text-muted mt-0.5">{m.hint}</p>}
+            {m.hint && <p className="text-xs text-muted mt-0.5">{m.hint}</p>}
           </div>
         ))}
       </div>
@@ -51,7 +51,7 @@ function TrendBadge({ label, value }) {
     : value?.includes('down') || value === 'decreasing' ? 'text-danger' : 'text-warning';
   return (
     <div className="text-center bg-surface/40 rounded-xl py-2">
-      <p className="text-[10px] text-muted uppercase">{label}</p>
+      <p className="text-xs text-muted uppercase">{label}</p>
       <p className={`text-xs font-bold mt-1 ${color}`}>{value?.replace('_', ' ').toUpperCase()}</p>
     </div>
   );

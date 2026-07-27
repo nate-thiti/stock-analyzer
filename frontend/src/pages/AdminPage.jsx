@@ -101,7 +101,7 @@ export default function AdminPage() {
   return (
     <div className="space-y-6 w-full min-w-0">
       <div>
-        <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
+        <h2 className="text-2xl sm:text-3xl font-black text-foreground flex items-center gap-2">
           <Shield size={24} className="text-primary" />
           จัดการผู้ใช้
         </h2>
@@ -121,7 +121,7 @@ export default function AdminPage() {
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className="text-[10px] font-bold text-muted uppercase">ชื่อผู้ใช้</label>
+            <label className="text-xs font-bold text-muted uppercase">ชื่อผู้ใช้</label>
             <input
               type="text"
               placeholder="username"
@@ -132,7 +132,7 @@ export default function AdminPage() {
             />
           </div>
           <div>
-            <label className="text-[10px] font-bold text-muted uppercase">อีเมล</label>
+            <label className="text-xs font-bold text-muted uppercase">อีเมล</label>
             <input
               type="email"
               placeholder="you@example.com"
@@ -143,7 +143,7 @@ export default function AdminPage() {
             />
           </div>
           <div>
-            <label className="text-[10px] font-bold text-muted uppercase">รหัสผ่าน</label>
+            <label className="text-xs font-bold text-muted uppercase">รหัสผ่าน</label>
             <input
               type="password"
               placeholder="อย่างน้อย 6 ตัว"
@@ -179,11 +179,11 @@ export default function AdminPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/40 bg-surface/40">
-                  <th className="text-left py-3 px-4 text-[10px] text-muted uppercase">ID</th>
-                  <th className="text-left py-3 px-4 text-[10px] text-muted uppercase">ชื่อผู้ใช้</th>
-                  <th className="text-left py-3 px-4 text-[10px] text-muted uppercase">อีเมล</th>
-                  <th className="text-left py-3 px-4 text-[10px] text-muted uppercase">บทบาท</th>
-                  <th className="text-right py-3 px-4 text-[10px] text-muted uppercase">จัดการ</th>
+                  <th className="text-left py-3 px-4 text-xs text-muted uppercase">ID</th>
+                  <th className="text-left py-3 px-4 text-xs text-muted uppercase">ชื่อผู้ใช้</th>
+                  <th className="text-left py-3 px-4 text-xs text-muted uppercase">อีเมล</th>
+                  <th className="text-left py-3 px-4 text-xs text-muted uppercase">บทบาท</th>
+                  <th className="text-right py-3 px-4 text-xs text-muted uppercase">จัดการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -193,7 +193,7 @@ export default function AdminPage() {
                       <td colSpan={5} className="p-4">
                         <form onSubmit={handleUpdate} className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                           <div>
-                            <label className="text-[10px] font-bold text-muted uppercase">ชื่อผู้ใช้</label>
+                            <label className="text-xs font-bold text-muted uppercase">ชื่อผู้ใช้</label>
                             <input
                               value={editForm.username}
                               onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
@@ -201,7 +201,7 @@ export default function AdminPage() {
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] font-bold text-muted uppercase">อีเมล</label>
+                            <label className="text-xs font-bold text-muted uppercase">อีเมล</label>
                             <input
                               type="email"
                               value={editForm.email}
@@ -210,7 +210,7 @@ export default function AdminPage() {
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] font-bold text-muted uppercase">รหัสผ่าน</label>
+                            <label className="text-xs font-bold text-muted uppercase">รหัสผ่าน</label>
                             <input
                               type="password"
                               placeholder="ว่าง = ไม่เปลี่ยน"
@@ -278,11 +278,11 @@ export default function AdminPage() {
           placeholder="AAPL, MSFT, NVDA, PTT.BK..."
           className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary"
         />
-        <p className="text-[10px] text-muted">{watchlist.length} หุ้นในปัจจุบัน</p>
+        <p className="text-xs text-muted">{watchlist.length} หุ้นในปัจจุบัน</p>
         {watchlist.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {watchlist.map((sym) => (
-              <span key={sym} className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-surface border border-border/40 text-muted">
+              <span key={sym} className="px-2 py-0.5 rounded-md text-xs font-mono bg-surface border border-border/40 text-muted">
                 {sym}
               </span>
             ))}

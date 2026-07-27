@@ -11,23 +11,23 @@ export default function PriceRangeGrid({ low, high, current, currency, rangeLabe
   return (
     <div className={compact ? 'space-y-2' : 'mt-3 space-y-2'}>
       {rangeLabel && (
-        <p className="text-[10px] text-muted font-bold uppercase text-center md:text-left">
+        <p className="text-xs text-muted font-bold uppercase text-center md:text-left">
           ช่วงราคา ({rangeLabel})
         </p>
       )}
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-surface/60 p-2.5 rounded-xl border border-danger/20 text-center">
-          <p className="text-[10px] text-muted uppercase">ต่ำสุด</p>
+          <p className="text-xs text-muted uppercase">ต่ำสุด</p>
           <p className="text-xs font-mono font-bold text-danger mt-1">{formatMoney(low, currency)}</p>
         </div>
         <div className="bg-surface/60 p-2.5 rounded-xl border border-success/20 text-center">
-          <p className="text-[10px] text-muted uppercase">สูงสุด</p>
+          <p className="text-xs text-muted uppercase">สูงสุด</p>
           <p className="text-xs font-mono font-bold text-success mt-1">{formatMoney(high, currency)}</p>
         </div>
       </div>
       {current != null && range != null && range > 0 && (
         <div>
-          <div className="flex justify-between text-[10px] text-muted mb-1">
+          <div className="flex justify-between text-xs text-muted mb-1">
             <span>ราคาปัจจุบัน</span>
             <span className="font-mono font-bold text-foreground">{formatMoney(current, currency)}</span>
           </div>
@@ -38,7 +38,7 @@ export default function PriceRangeGrid({ low, high, current, currency, rangeLabe
             />
           </div>
           {rangeLabel && (
-            <p className="text-[9px] text-muted mt-1 text-right">
+            <p className="text-xs text-muted mt-1 text-right">
               {pctInRange?.toFixed(0)}% ของช่วงที่เลือก
             </p>
           )}

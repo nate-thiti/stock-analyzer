@@ -34,7 +34,7 @@ function VisualPanel({ tagline }) {
       <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-background/30 pointer-events-none z-[1]" />
 
       <div className="relative z-10 h-full min-h-dvh flex flex-col items-center justify-between text-center px-8 xl:px-10 py-10 pointer-events-none">
-        <div className="flex items-center gap-1.5 text-[10px] text-muted/90 mt-2">
+        <div className="flex items-center gap-1.5 text-xs text-muted/90 mt-2">
           <Globe2 size={12} className="text-primary/80" />
           {MARKETS.map((m, i) => (
             <span key={m}>
@@ -84,7 +84,7 @@ export default function AuthPageLayout({
             <div className="mb-6 lg:mb-7 lg:text-center">
               <div className="flex items-center gap-2 text-primary/80 mb-1 lg:justify-center">
                 <Icon size={16} />
-                <span className="text-[11px] font-medium uppercase tracking-wide">{title}</span>
+                <span className="text-sm font-medium uppercase tracking-wide">{title}</span>
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-foreground">{subtitle}</h1>
             </div>

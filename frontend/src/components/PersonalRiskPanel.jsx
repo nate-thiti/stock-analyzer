@@ -9,9 +9,9 @@ export default function PersonalRiskPanel({ personalized, currency }) {
 
   return (
     <div className="mb-4 p-4 rounded-xl border border-primary/25 bg-primary/5 space-y-3">
-      <h4 className="text-[10px] font-bold text-primary uppercase">ความเสี่ยงส่วนบุคคล</h4>
+      <h4 className="text-xs font-bold text-primary uppercase">ความเสี่ยงส่วนบุคคล</h4>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[10px]">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
         <Stat label="ยอมรับขาดทุนสูงสุด" value={`${personalized.max_loss_tolerance_pct}%`} />
         <Stat
           label="ขาดทุนปัจจุบัน"
@@ -43,14 +43,14 @@ export default function PersonalRiskPanel({ personalized, currency }) {
       </div>
 
       {personalized.technical_stop_breached && (
-        <p className="text-[10px] text-danger flex items-center gap-1">
+        <p className="text-xs text-danger flex items-center gap-1">
           <AlertTriangle size={11} />
           ราคาต่ำกว่า Technical Stop — พิจารณาลดความเสี่ยง
         </p>
       )}
 
       {personalized.notes?.length > 0 && (
-        <ul className="text-[10px] text-muted space-y-1 border-t border-border/30 pt-2">
+        <ul className="text-xs text-muted space-y-1 border-t border-border/30 pt-2">
           {personalized.notes.map((note, i) => (
             <li key={i} className="leading-relaxed">• {note}</li>
           ))}
@@ -63,9 +63,9 @@ export default function PersonalRiskPanel({ personalized, currency }) {
 function Stat({ label, value, hint }) {
   return (
     <div className="bg-surface/50 p-2 rounded-lg border border-border/30">
-      <p className="text-muted uppercase text-[9px]">{label}</p>
+      <p className="text-muted uppercase text-xs">{label}</p>
       <p className="font-mono font-bold text-foreground mt-0.5">{value}</p>
-      {hint && <p className="text-[9px] text-warning/90 mt-0.5">{hint}</p>}
+      {hint && <p className="text-xs text-warning/90 mt-0.5">{hint}</p>}
     </div>
   );
 }

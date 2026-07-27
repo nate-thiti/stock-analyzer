@@ -311,7 +311,7 @@ export default function StockChart({ history, interval = '1d', exchangeTimezone 
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2 text-[10px]">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className={`px-2 py-0.5 rounded-md border font-semibold ${TREND_STYLES[indicators.trend]}`}>
           <InfoTip term={GLOSSARY.trend} label={`เทรนด์: ${indicators.trendLabel}`} />
         </span>

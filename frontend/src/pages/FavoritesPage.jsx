@@ -15,7 +15,7 @@ export default function FavoritesPage() {
   return (
     <div className="space-y-6 w-full min-w-0">
       <div>
-        <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
+        <h2 className="text-2xl sm:text-3xl font-black text-foreground flex items-center gap-2">
           <Star size={24} className="text-warning fill-warning" />
           หุ้นติดดาว
         </h2>

@@ -89,8 +89,8 @@ export default function SelectField({
   };
 
   const sizeClass = size === 'sm'
-    ? 'text-xs py-1.5 px-2.5'
-    : 'text-sm py-2 px-3';
+    ? 'text-sm py-2 px-3'
+    : 'text-base py-2.5 px-3';
 
   const menu = open && !disabled ? createPortal(
     <ul
@@ -107,7 +107,7 @@ export default function SelectField({
             <button
               type="button"
               onClick={() => pick(opt.value)}
-              className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors ${
+              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left text-sm transition-colors ${
                 active
                   ? 'bg-primary/12 text-primary font-semibold'
                   : 'text-foreground hover:bg-surface/80'
@@ -126,7 +126,7 @@ export default function SelectField({
   return (
     <div ref={wrapRef} className={`relative ${className}`}>
       {label && (
-        <span id={`${id}-label`} className="text-[10px] text-muted font-bold uppercase tracking-wide">
+        <span id={`${id}-label`} className="text-sm text-muted font-bold uppercase tracking-wide">
           {label}
         </span>
       )}

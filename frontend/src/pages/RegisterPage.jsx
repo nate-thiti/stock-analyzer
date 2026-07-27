@@ -58,7 +58,7 @@ export default function RegisterPage() {
 
         <div className="space-y-4">
           <div>
-            <label className="text-[10px] font-bold text-muted uppercase">ชื่อผู้ใช้</label>
+            <label className="text-xs font-bold text-muted uppercase">ชื่อผู้ใช้</label>
             <input
               type="text"
               value={username}
@@ -72,7 +72,7 @@ export default function RegisterPage() {
             />
           </div>
           <div>
-            <label className="text-[10px] font-bold text-muted uppercase">อีเมล</label>
+            <label className="text-xs font-bold text-muted uppercase">อีเมล</label>
             <input
               type="email"
               value={email}
@@ -84,7 +84,7 @@ export default function RegisterPage() {
             />
           </div>
           <div>
-            <label className="text-[10px] font-bold text-muted uppercase">รหัสผ่าน</label>
+            <label className="text-xs font-bold text-muted uppercase">รหัสผ่าน</label>
             <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -95,7 +95,7 @@ export default function RegisterPage() {
             />
           </div>
           <div>
-            <label className="text-[10px] font-bold text-muted uppercase">ยืนยันรหัสผ่าน</label>
+            <label className="text-xs font-bold text-muted uppercase">ยืนยันรหัสผ่าน</label>
             <PasswordInput
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}

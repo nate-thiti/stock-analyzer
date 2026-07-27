@@ -157,7 +157,7 @@ function PerformerCard({ label, position, positive, icon, currency }) {
       to={`/stock/${position.symbol}`}
       className={`glass-card rounded-xl p-4 border transition-colors hover:border-primary/40 ${positive ? 'border-success/20' : 'border-danger/20'}`}
     >
-      <p className="text-[10px] text-muted uppercase flex items-center gap-1">{icon} {label}</p>
+      <p className="text-xs text-muted uppercase flex items-center gap-1">{icon} {label}</p>
       <p className="font-mono font-black text-lg mt-1">{position.symbol}</p>
       {position.name && <p className="text-xs text-muted truncate">{position.name}</p>}
       <p className={`text-sm font-mono font-bold mt-2 ${positive ? 'text-success' : 'text-danger'}`}>

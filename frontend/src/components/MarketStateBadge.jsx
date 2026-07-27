@@ -19,7 +19,7 @@ export default function MarketStateBadge({ marketState, compact = false }) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-md border font-bold shrink-0 ${
-        compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-0.5 text-[10px]'
+        compact ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-0.5 text-sm'
       } ${style}`}
       title={label}
     >

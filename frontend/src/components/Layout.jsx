@@ -81,21 +81,21 @@ export default function Layout() {
                 <Link
                   key={to}
                   to={to}
-                  className={navLinkClass(pathname === to, 'text-xs px-2 2xl:px-3 py-2 whitespace-nowrap')}
+                  className={navLinkClass(pathname === to, 'text-sm px-2 2xl:px-3 py-2 whitespace-nowrap')}
                 >
                   <Icon size={14} className="icon-animate shrink-0" />
                   <span className="hidden 2xl:inline">{label}</span>
                 </Link>
               ))}
               {adminLink && (
-                <Link to={adminLink.to} className={adminLinkClass(pathname === adminLink.to, 'text-xs px-2 2xl:px-3 py-2 whitespace-nowrap')}>
+                <Link to={adminLink.to} className={adminLinkClass(pathname === adminLink.to, 'text-sm px-2 2xl:px-3 py-2 whitespace-nowrap')}>
                   <adminLink.icon size={14} />
                   <span className="hidden 2xl:inline">{adminLink.label}</span>
                 </Link>
               )}
             </nav>
 
-            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-surface/60 border border-border/40 text-[10px] text-muted max-w-[100px] 2xl:max-w-[140px]">
+            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-surface/60 border border-border/40 text-xs sm:text-sm text-muted max-w-[120px] 2xl:max-w-[160px]">
               <User size={12} className="shrink-0" />
               <span className="truncate">{user?.username}</span>
             </div>
@@ -115,7 +115,7 @@ export default function Layout() {
                 <Bell size={16} />
               )}
               {triggered.length > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-warning text-[9px] font-bold text-background flex items-center justify-center">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-warning text-xs font-bold text-background flex items-center justify-center">
                   {triggered.length > 9 ? '9+' : triggered.length}
                 </span>
               )}
@@ -146,7 +146,7 @@ export default function Layout() {
             >
               {triggered.length > 0 ? <BellRing size={18} className="animate-pulse" /> : <Bell size={18} />}
               {triggered.length > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 px-0.5 rounded-full bg-warning text-[8px] font-bold text-background flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 rounded-full bg-warning text-xs font-bold text-background flex items-center justify-center">
                   {triggered.length > 9 ? '9+' : triggered.length}
                 </span>
               )}
@@ -224,7 +224,7 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      <footer className="relative z-10 shrink-0 border-t border-border/40 py-3 sm:py-4 text-center text-[10px] text-muted backdrop-blur-sm px-3 sm:px-4 leading-relaxed">
+      <footer className="relative z-10 shrink-0 border-t border-border/40 py-3 sm:py-4 text-center text-xs sm:text-sm text-muted backdrop-blur-sm px-3 sm:px-4 leading-relaxed">
         <BarChart3 size={12} className="inline mr-1 text-primary" />
         ข้อมูลจาก Yahoo Finance • ใช้เพื่อการศึกษา •{' '}
         <Link to="/guide" className="text-primary hover:underline">คู่มือการใช้งาน</Link>

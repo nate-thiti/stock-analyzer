@@ -99,7 +99,7 @@ export default function PriceAlertButton({ symbol, currentPrice, currency, alert
             ]}
           />
           <div>
-            <label className="text-[10px] font-bold text-muted uppercase">ราคาเป้า</label>
+            <label className="text-xs font-bold text-muted uppercase">ราคาเป้า</label>
             <input
               type="number"
               step="any"
@@ -124,7 +124,7 @@ export default function PriceAlertButton({ symbol, currentPrice, currency, alert
 
         {symbolAlerts.length > 0 && (
           <div className="border-t border-border/40 pt-3 space-y-2">
-            <p className="text-[10px] font-bold text-muted uppercase">Alert ที่ตั้งไว้</p>
+            <p className="text-xs font-bold text-muted uppercase">Alert ที่ตั้งไว้</p>
             {symbolAlerts.map((a) => {
               const distance = a.current_price != null
                 ? computeDistanceToTrigger(a.current_price, a.target_price, a.direction)
@@ -156,7 +156,7 @@ export default function PriceAlertButton({ symbol, currentPrice, currency, alert
 export function AlertTriggeredBadge({ show, label = 'ถึงราคาเป้า' }) {
   if (!show) return null;
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-warning/15 border border-warning/30 text-warning text-[10px] font-bold">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-warning/15 border border-warning/30 text-warning text-xs font-bold">
       <BellRing size={10} /> {label}
     </span>
   );

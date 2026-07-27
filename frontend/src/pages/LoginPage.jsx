@@ -50,7 +50,7 @@ export default function LoginPage() {
 
         <div className="space-y-4">
           <div>
-            <label className="text-[10px] font-bold text-muted uppercase">อีเมล</label>
+            <label className="text-xs font-bold text-muted uppercase">อีเมล</label>
             <input
               type="email"
               value={email}
@@ -62,7 +62,7 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="text-[10px] font-bold text-muted uppercase">รหัสผ่าน</label>
+            <label className="text-xs font-bold text-muted uppercase">รหัสผ่าน</label>
             <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}

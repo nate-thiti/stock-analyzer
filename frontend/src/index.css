@@ -70,15 +70,32 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-surface: var(--surface);
+
+  /* ขนาดตัวอักษร — อ่านง่ายทุกหน้าจอ (ไม่ใช้ 8–11px) */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.45;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.55;
+  --text-base: 1rem;
+  --text-base--line-height: 1.6;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.55;
+  --text-xl: 1.3125rem;
+  --text-xl--line-height: 1.45;
+  --text-2xl: 1.5625rem;
+  --text-2xl--line-height: 1.35;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 1.25;
 }
 
 /* ── Base ── */
 html {
-  font-size: 16px;
+  font-size: clamp(15px, 14px + 0.35vw, 17px);
   background-color: var(--bg);
   transition: background-color 0.4s ease, color 0.4s ease;
   overflow-x: clip;
   -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 #root {
@@ -100,9 +117,16 @@ body {
   color: var(--foreground);
   font-family: 'Inter', 'Sarabun', system-ui, -apple-system, sans-serif;
   font-size: 1rem;
-  line-height: 1.5;
+  line-height: 1.6;
   overflow-x: clip;
   transition: background-color 0.4s ease, color 0.4s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ป้าย/หัวตาราง — ตัวเล็กแต่อ่านได้ */
+.text-xs.uppercase {
+  letter-spacing: 0.03em;
 }
 
 /* ป้องกัน flex/grid child ดันหลุดจอ */

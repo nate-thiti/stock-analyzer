@@ -15,7 +15,7 @@ export default function QuickCompareSection() {
         </div>
         <Link
           to="/compare"
-          className="hidden sm:flex items-center gap-1 text-[11px] text-primary hover:underline shrink-0 mt-1"
+          className="hidden sm:flex items-center gap-1 text-sm text-primary hover:underline shrink-0 mt-1"
         >
           เปรียบเทียบเอง <ArrowRight size={12} />
         </Link>
@@ -27,7 +27,7 @@ export default function QuickCompareSection() {
             key={group.title}
             className="rounded-xl border border-border/50 bg-surface/30 p-3 hover:border-primary/20 transition-colors"
           >
-            <p className="text-[10px] font-bold text-muted uppercase tracking-wide mb-2.5 pb-2 border-b border-border/30">
+            <p className="text-xs font-bold text-muted uppercase tracking-wide mb-2.5 pb-2 border-b border-border/30">
               {group.title}
             </p>
             <div className="grid grid-cols-2 gap-1.5">
@@ -38,10 +38,10 @@ export default function QuickCompareSection() {
                   className="group/item flex flex-col px-2.5 py-2 rounded-lg bg-background/60 border border-border/40 hover:border-primary/40 hover:bg-primary/5 transition-all min-h-[52px] justify-center"
                   title={symbols.join(', ')}
                 >
-                  <span className="text-[11px] font-semibold text-foreground group-hover/item:text-primary leading-tight">
+                  <span className="text-sm font-semibold text-foreground group-hover/item:text-primary leading-tight">
                     {label}
                   </span>
-                  <span className="text-[9px] font-mono text-muted/80 truncate mt-0.5">
+                  <span className="text-xs font-mono text-muted/80 truncate mt-0.5">
                     {symbols.join(' · ')}
                   </span>
                 </Link>

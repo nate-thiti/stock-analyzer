@@ -52,6 +52,107 @@ const PERSONALIZED_STYLE_MAP = {
   AVOID_NEW: 'hold',
 };
 
+const SELL_PERSONALIZED_ACTIONS = new Set(['REDUCE_OR_SELL', 'CONSIDER_REDUCING', 'REDUCE_RISK']);
+const BUY_PERSONALIZED_ACTIONS = new Set(['CONSIDER_ADDING', 'CONSIDER_BUY_NEW']);
+
+function effectivePlanAction(plan, personalizedRisk) {
+  if (!personalizedRisk?.has_position) return plan.action;
+  if (SELL_PERSONALIZED_ACTIONS.has(personalizedRisk.action)) return 'sell';
+  if (BUY_PERSONALIZED_ACTIONS.has(personalizedRisk.action)) return 'buy';
+  return 'hold';
+}
+
+function patchDetailedAnalysis(detailed, personalizedRisk) {
+  if (!detailed || !personalizedRisk?.has_position) return detailed;
+  const label = personalizedRisk.action_label;
+  const note = personalizedRisk.summary;
+  return detailed.replace(
+    /【แผนปฏิบัติ】[^\n]*/,
+    `【แผนปฏิบัติ】${note} — คำแนะนำหลัก「${label}」(ปรับตามความเสี่ยงส่วนบุคคลและสถานะพอร์ตจริง)`,
+  );
+}
+
+function getPersonalizedDca(plan, positionMode, personalizedRisk) {
+  if (!personalizedRisk?.has_position) {
+    return getContextualDca(plan, positionMode);
+  }
+
+  const effective = effectivePlanAction(plan, personalizedRisk);
+  const virtualPlan = { ...plan, action: effective };
+
+  if (SELL_PERSONALIZED_ACTIONS.has(personalizedRisk.action)) {
+    return [{
+      tranche: 1,
+      pct: 100,
+      price_target: plan.entry_price,
+      shares: 0,
+      amount: 0,
+      note: personalizedRisk.action === 'REDUCE_OR_SELL'
+        ? 'ลดสัดส่วนหรือขาย — เกินขีดจำกัดความเสี่ยงส่วนบุคคลหรือสัดส่วนในพอร์ต ปกป้องพอร์ตก่อนรอสัญญาณกลับตัว'
+        : 'พิจารณาลดบางส่วน — สัญญาณวิเคราะห์และสถานะพอร์ตไม่สนับสนุนการถือเต็มที่',
+    }];
+  }
+
+  if (personalizedRisk.action === 'HOLD_DO_NOT_ADD' || personalizedRisk.action === 'HOLD_WITH_TIGHT_RISK_CONTROL') {
+    return [{
+      tranche: 1,
+      pct: 100,
+      price_target: plan.entry_price,
+      shares: 0,
+      amount: 0,
+      note: personalizedRisk.summary,
+    }];
+  }
+
+  return getContextualDca(virtualPlan, positionMode);
+}
+
+function getPersonalizedRiskNotes(riskNotes, personalizedRisk, plan) {
+  if (!personalizedRisk?.has_position || !riskNotes?.length) return riskNotes;
+
+  const conf = ((plan.confidence ?? 0) * 100).toFixed(0);
+  const notes = [...riskNotes];
+  notes[0] = `หลักการจัดการความเสี่ยง (ความมั่นใจ ${conf}%): ${personalizedRisk.summary}`;
+
+  if (SELL_PERSONALIZED_ACTIONS.has(personalizedRisk.action)) {
+    const portfolioNotes = [
+      `สถานะปัจจุบัน: ขาดทุน ${personalizedRisk.current_loss_pct ?? '-'}% · ใช้ขีดจำกัดไป ${personalizedRisk.risk_usage_pct ?? '-'}%`,
+    ];
+    if (
+      personalizedRisk.position_pct != null
+      && personalizedRisk.position_pct >= personalizedRisk.max_position_pct
+    ) {
+      portfolioNotes.push(
+        `สัดส่วนในพอร์ต ~${personalizedRisk.position_pct}% เกินเพดาน ${personalizedRisk.max_position_pct}% — ควรลดให้อยู่ในระดับที่ตั้งไว้`,
+      );
+    }
+    if (personalizedRisk.effective_stop != null) {
+      portfolioNotes.push(
+        `Stop ที่ระบบใช้ ${personalizedRisk.effective_stop.toLocaleString()} — ถ้าราคาหลุดจุดนี้ให้ออกตามแผน`,
+      );
+    }
+
+    return notes
+      .filter((n) => !n.startsWith('ขนาดสถานะ:') && !n.startsWith('เมื่อราคาไปถึงเป้าหมาย'))
+      .concat(portfolioNotes);
+  }
+
+  if (personalizedRisk.action === 'HOLD_DO_NOT_ADD' || personalizedRisk.action === 'HOLD_WITH_TIGHT_RISK_CONTROL') {
+    return notes.filter((n) => !n.startsWith('ขนาดสถานะ:'));
+  }
+
+  return notes;
+}
+
+function buildPortfolioAlignedSummary(plan, personalizedRisk, currency) {
+  if (!personalizedRisk?.has_position) return plan.summary;
+  const label = personalizedRisk.action_label;
+  const price = plan.entry_price?.toFixed(2);
+  const stop = personalizedRisk.effective_stop ?? plan.stop_loss;
+  const stopText = stop != null ? `${stop.toFixed(2)} ${currency}` : '-';
+  return `สรุป (ตามพอร์ต): ${label} — ${personalizedRisk.summary} ราคาปัจจุบัน ${price} ${currency} · Stop ที่ใช้ ${stopText}`;
+}
+
 function formatPlanDate(iso) {
   if (!iso) return new Date().toLocaleDateString('th-TH', { dateStyle: 'long' });
   const d = new Date(iso.includes('T') ? iso : `${iso}T12:00:00`);
@@ -108,12 +209,12 @@ function NoteList({ title, items, color = 'primary' }) {
   const introBg = color === 'success' ? 'bg-success/5 border-success/20' : color === 'warning' ? 'bg-warning/5 border-warning/20' : 'bg-primary/5 border-primary/20';
   return (
     <div>
-      <h4 className="text-[10px] font-bold text-muted uppercase mb-2">{title}</h4>
+      <h4 className="text-xs font-bold text-muted uppercase mb-2">{title}</h4>
       <ul className="space-y-2">
         {items.map((r, i) => (
           <li
             key={i}
-            className={`text-[11px] text-foreground/85 flex items-start gap-2 leading-relaxed ${
+            className={`text-sm text-foreground/85 flex items-start gap-2 leading-relaxed ${
               i === 0 ? `p-2.5 rounded-lg border ${introBg} font-medium` : ''
             }`}
           >
@@ -133,12 +234,16 @@ export default function TradingPlanPanel({ plan, currency, embedded = false, pos
 
   const guidance = POSITION_GUIDANCE[positionMode][plan.action] || POSITION_GUIDANCE[positionMode].hold;
   const planDate = formatPlanDate(plan.plan_date);
-  const dcaTitle = positionMode === 'holding' && plan.action === 'buy'
+  const effectiveAction = effectivePlanAction(plan, personalizedRisk);
+  const dcaTitle = positionMode === 'holding' && effectiveAction === 'buy'
     ? 'แผนแบ่งซื้อเพิ่ม (DCA)'
-    : plan.action === 'buy'
+    : effectiveAction === 'buy'
       ? 'แผนแบ่งซื้อ (DCA)'
       : 'แนวทางปฏิบัติ';
-  const dcaSplits = getContextualDca(plan, positionMode);
+  const dcaSplits = getPersonalizedDca(plan, positionMode, personalizedRisk);
+  const displaySummary = buildPortfolioAlignedSummary(plan, personalizedRisk, currency);
+  const displayDetailedAnalysis = patchDetailedAnalysis(plan.detailed_analysis, personalizedRisk);
+  const displayRiskNotes = getPersonalizedRiskNotes(plan.risk_notes, personalizedRisk, plan);
 
   const displayLabel = personalizedRisk?.action_label ?? guidance.label;
   const displayStyleKey = personalizedRisk
@@ -157,23 +262,23 @@ export default function TradingPlanPanel({ plan, currency, embedded = false, pos
           <Wallet size={16} className="text-primary" />
           {personalizedRisk ? 'แผนการลงทุนที่ปรับตามความเสี่ยงของคุณ' : 'แผนการลงทุนวันนี้'}
         </h3>
-        <p className="text-[11px] text-muted mt-1 flex items-center gap-1.5">
+        <p className="text-sm text-muted mt-1 flex items-center gap-1.5">
           <Calendar size={11} className="text-primary shrink-0" />
           {planDate}
         </p>
-        <p className="text-[10px] text-muted/80 mt-0.5 italic">
+        <p className="text-xs text-muted/80 mt-0.5 italic">
           (คาดการณ์จากข้อมูลย้อนหลัง)
         </p>
       </div>
 
       <div className="mb-4">
         {position ? (
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/10 text-primary">
+          <span className="inline-flex items-center gap-1.5 text-sm font-bold px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/10 text-primary">
             <Package size={13} />
             ถืออยู่
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-border/50 bg-surface/60 text-muted">
+          <span className="inline-flex items-center gap-1.5 text-sm font-bold px-3 py-1.5 rounded-lg border border-border/50 bg-surface/60 text-muted">
             <ShoppingCart size={13} />
             ยังไม่ได้ถือ
           </span>
@@ -199,24 +304,24 @@ export default function TradingPlanPanel({ plan, currency, embedded = false, pos
         </div>
       </div>
 
-      <p className="text-[11px] text-foreground/75 bg-surface/40 px-3 py-2 rounded-lg border border-border/30 mb-4 leading-relaxed">
+      <p className="text-sm text-foreground/75 bg-surface/40 px-3 py-2 rounded-lg border border-border/30 mb-4 leading-relaxed">
         {personalizedRisk?.summary ?? guidance.hint}
       </p>
 
       <PersonalRiskPanel personalized={personalizedRisk} currency={currency} />
 
       <p className="text-xs text-foreground/80 bg-surface/60 p-3 rounded-xl border border-border/30 mb-4 leading-relaxed">
-        {plan.summary}
+        {displaySummary}
       </p>
 
       {position && (
         <div className="mb-4 p-3 rounded-xl bg-primary/5 border border-primary/20 grid grid-cols-2 gap-2 text-xs">
           <div>
-            <p className="text-[10px] text-muted uppercase">ถืออยู่จริง</p>
+            <p className="text-xs text-muted uppercase">ถืออยู่จริง</p>
             <p className="font-mono font-bold text-foreground">{position.shares} หุ้น @ {formatMoney(position.avg_cost, currency)}</p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] text-muted uppercase">P/L</p>
+            <p className="text-xs text-muted uppercase">P/L</p>
             <p className={`font-mono font-bold ${(position.unrealized_pnl ?? 0) >= 0 ? 'text-success' : 'text-danger'}`}>
               {position.unrealized_pnl != null
                 ? formatPnl(position.unrealized_pnl, position.unrealized_pnl_pct, currency)
@@ -226,20 +331,20 @@ export default function TradingPlanPanel({ plan, currency, embedded = false, pos
         </div>
       )}
 
-      {plan.detailed_analysis && (
+      {displayDetailedAnalysis && (
         <div className="mb-4 p-3 rounded-xl bg-primary/5 border border-primary/20">
-          <h4 className="text-[10px] font-bold text-primary uppercase mb-2 flex items-center gap-1">
+          <h4 className="text-xs font-bold text-primary uppercase mb-2 flex items-center gap-1">
             <AlertCircle size={11} /> บทวิเคราะห์โดยสรุป
           </h4>
-          <div className="text-[11px] text-foreground/85 leading-relaxed space-y-3 whitespace-pre-line">
-            {plan.detailed_analysis.split('\n\n').map((para, i) => (
+          <div className="text-sm text-foreground/85 leading-relaxed space-y-3 whitespace-pre-line">
+            {displayDetailedAnalysis.split('\n\n').map((para, i) => (
               <p key={i} className={i === 0 ? 'font-medium text-foreground/90' : ''}>{para}</p>
             ))}
           </div>
         </div>
       )}
 
-      {(plan.action === 'buy' || plan.stop_loss) && (
+      {(effectiveAction === 'buy' || plan.stop_loss) && (
         <div className={`grid gap-3 mb-4 ${embedded ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}>
           <Metric label="Entry" value={plan.entry_price?.toFixed(2)} suffix={currency} />
           <Metric label="Target" value={plan.target_price?.toFixed(2)} suffix={currency} icon={<Target size={10} />} />
@@ -248,41 +353,41 @@ export default function TradingPlanPanel({ plan, currency, embedded = false, pos
         </div>
       )}
 
-      {plan.action === 'buy' && plan.position_size_shares > 0 && (
+      {effectiveAction === 'buy' && plan.position_size_shares > 0 && (
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="bg-surface/60 p-3 rounded-xl border border-border/30">
-            <p className="text-[10px] text-muted font-bold uppercase">
+            <p className="text-xs text-muted font-bold uppercase">
               {positionMode === 'holding' ? 'จำนวนเพิ่ม' : 'จำนวนหุ้น'}
             </p>
             <p className="text-lg font-bold text-foreground mt-1">{plan.position_size_shares.toLocaleString()} หุ้น</p>
-            <p className="text-[10px] text-muted">~{plan.position_size_amount?.toLocaleString()} {currency}</p>
+            <p className="text-xs text-muted">~{plan.position_size_amount?.toLocaleString()} {currency}</p>
           </div>
           <div className="bg-surface/60 p-3 rounded-xl border border-border/30">
-            <p className="text-[10px] text-muted font-bold uppercase">สัดส่วนพอร์ต</p>
+            <p className="text-xs text-muted font-bold uppercase">สัดส่วนพอร์ต</p>
             <p className="text-lg font-bold text-foreground mt-1">{plan.portfolio_allocation_pct}%</p>
-            <p className="text-[10px] text-muted">ATR {plan.atr?.toFixed(2) ?? '-'}</p>
+            <p className="text-xs text-muted">ATR {plan.atr?.toFixed(2) ?? '-'}</p>
           </div>
         </div>
       )}
 
       {dcaSplits.length > 0 && (
         <div className="mb-4">
-          <h4 className="text-[10px] font-bold text-muted uppercase mb-2 flex items-center gap-1">
+          <h4 className="text-xs font-bold text-muted uppercase mb-2 flex items-center gap-1">
             <Layers size={12} /> {dcaTitle}
           </h4>
           <div className="space-y-2">
             {dcaSplits.map((s) => (
               <div key={s.tranche} className="flex items-center justify-between bg-surface/60 p-3 rounded-xl border border-border/30 text-xs">
                 <div className="min-w-0 pr-2">
-                  {plan.action === 'buy' && (
+                  {effectiveAction === 'buy' && (
                     <>
                       <span className="font-bold text-foreground">งวด {s.tranche}</span>
                       <span className="text-muted ml-2">({s.pct}%)</span>
                     </>
                   )}
-                  <p className={`text-muted leading-snug ${plan.action === 'buy' ? 'mt-0.5' : ''}`}>{s.note}</p>
+                  <p className={`text-muted leading-snug ${effectiveAction === 'buy' ? 'mt-0.5' : ''}`}>{s.note}</p>
                 </div>
-                {plan.action === 'buy' && s.shares > 0 && (
+                {effectiveAction === 'buy' && s.shares > 0 && (
                   <div className="text-right shrink-0">
                     <p className="font-mono font-bold text-foreground">{s.shares} หุ้น @ {formatMoney(s.price_target, currency)}</p>
                     <p className="text-muted">{s.amount?.toLocaleString()} {currency}</p>
@@ -297,7 +402,7 @@ export default function TradingPlanPanel({ plan, currency, embedded = false, pos
       <div className="space-y-4 pt-3 border-t border-border/40">
         <NoteList title="มูลค่า & พื้นฐาน" items={plan.fundamental_notes} color="success" />
         <NoteList title="เทคนิค & เทรนด์" items={plan.technical_notes} color="primary" />
-        <NoteList title="ความเสี่ยง & การจัดการ" items={plan.risk_notes} color="warning" />
+        <NoteList title="ความเสี่ยง & การจัดการ" items={displayRiskNotes} color="warning" />
         {!plan.fundamental_notes?.length && plan.reasons?.length > 0 && (
           <NoteList title="เหตุผลประกอบ" items={plan.reasons} />
         )}
@@ -309,11 +414,11 @@ export default function TradingPlanPanel({ plan, currency, embedded = false, pos
 function Metric({ label, value, suffix, icon, danger }) {
   return (
     <div className="bg-surface/60 p-3 rounded-xl border border-border/50">
-      <p className="text-[10px] text-muted font-bold uppercase flex items-center gap-1">
+      <p className="text-xs text-muted font-bold uppercase flex items-center gap-1">
         {icon} {label}
       </p>
       <p className={`text-sm font-mono font-bold mt-1 ${danger ? 'text-danger' : 'text-foreground'}`}>
-        {value || '-'} {suffix && <span className="text-[10px] text-muted">{suffix}</span>}
+        {value || '-'} {suffix && <span className="text-xs text-muted">{suffix}</span>}
       </p>
     </div>
   );

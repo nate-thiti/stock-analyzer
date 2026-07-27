@@ -69,13 +69,13 @@ export default function GuidePage() {
 
       {/* TOC */}
       <nav className="glass-card rounded-2xl p-4 sm:p-5 lg:sticky lg:top-[60px] lg:z-20">
-        <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-3">สารบัญ</p>
+        <p className="text-xs font-bold text-muted uppercase tracking-wider mb-3">สารบัญ</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {SECTIONS.map(({ id, label, icon: Icon }) => (
             <a
               key={id}
               href={`#${id}`}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-medium bg-surface/60 border border-border/40 text-muted hover:text-primary hover:border-primary/30 transition-colors min-w-0"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl text-sm sm:text-xs font-medium bg-surface/60 border border-border/40 text-muted hover:text-primary hover:border-primary/30 transition-colors min-w-0"
             >
               <Icon size={12} className="shrink-0" />
               <span className="truncate">{label}</span>
@@ -96,7 +96,7 @@ export default function GuidePage() {
           mock={
             <MockFrame title="stock-analyzer.app/register">
               <MockLogin />
-              <p className="text-[9px] text-center text-muted mt-2">→ เปลี่ยนเป็นลิงก์ สมัครสมาชิก</p>
+              <p className="text-xs text-center text-muted mt-2">→ เปลี่ยนเป็นลิงก์ สมัครสมาชิก</p>
             </MockFrame>
           }
         />
@@ -143,7 +143,7 @@ export default function GuidePage() {
           mock={
             <MockFrame title="/">
               <MockSearchBar />
-              <div className="rounded-xl border border-border/40 divide-y divide-border/30 text-[10px]">
+              <div className="rounded-xl border border-border/40 divide-y divide-border/30 text-xs">
                 <div className="px-3 py-2 flex justify-between"><span><b>AAPL</b> Apple Inc.</span><span className="text-muted">NASDAQ</span></div>
                 <div className="px-3 py-2 flex justify-between"><span><b>PTT.BK</b> PTT</span><span className="text-muted">SET</span></div>
               </div>
@@ -225,8 +225,8 @@ export default function GuidePage() {
             <MockFrame title="/stock/MSFT">
               <MockStockHeader />
               <div className="flex gap-2 mt-2 mb-2">
-                <span className="text-[9px] px-2 py-1 rounded-lg bg-surface border border-border/40">6 เดือน ▾</span>
-                <span className="text-[9px] px-2 py-1 rounded-lg bg-surface border border-border/40">รายวัน ▾</span>
+                <span className="text-xs px-2 py-1 rounded-lg bg-surface border border-border/40">6 เดือน ▾</span>
+                <span className="text-xs px-2 py-1 rounded-lg bg-surface border border-border/40">รายวัน ▾</span>
               </div>
               <MockChart />
             </MockFrame>
@@ -256,7 +256,7 @@ export default function GuidePage() {
           ]}
           mock={
             <MockFrame title="ข้อมูลบริษัท">
-              <div className="grid grid-cols-2 gap-2 text-[9px]">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 {['Sector: Technology', 'P/E: 32.5', 'Div Yield: 0.7%', 'Beta: 0.89'].map((t) => (
                   <div key={t} className="bg-surface/60 rounded-lg p-2 border border-border/30">{t}</div>
                 ))}
@@ -317,11 +317,11 @@ export default function GuidePage() {
             <MockFrame title="Portfolio Dashboard">
               <div className="grid grid-cols-2 gap-2 mb-2">
                 <div className="rounded-lg p-2 bg-surface/60 border border-border/40 text-center">
-                  <p className="text-[8px] text-muted">มูลค่ารวม</p>
+                  <p className="text-xs text-muted">มูลค่ารวม</p>
                   <p className="text-sm font-black">125,400</p>
                 </div>
                 <div className="rounded-lg p-2 bg-success/10 border border-success/25 text-center">
-                  <p className="text-[8px] text-muted">กำไร</p>
+                  <p className="text-xs text-muted">กำไร</p>
                   <p className="text-sm font-black text-success">+8,200</p>
                 </div>
               </div>
@@ -431,7 +431,7 @@ export default function GuidePage() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs sm:text-sm min-w-[280px]">
                 <thead>
-                  <tr className="text-[10px] text-muted uppercase border-b border-border/40">
+                  <tr className="text-xs text-muted uppercase border-b border-border/40">
                     <th className="text-left py-2 pr-4">หน้า / ฟีเจอร์</th>
                     <th className="text-left py-2">Refresh</th>
                   </tr>

@@ -89,7 +89,7 @@ export default function HomePage() {
                   <span className="font-mono font-bold text-foreground">{r.symbol}</span>
                   <span className="text-xs text-muted ml-2">{r.name}</span>
                 </div>
-                <span className="text-[10px] text-muted">{r.exchange}</span>
+                <span className="text-xs text-muted">{r.exchange}</span>
               </Link>
             ))}
           </div>
@@ -99,7 +99,7 @@ export default function HomePage() {
       <RecentStocksSection />
 
       <section>
-        <h3 className="text-xs font-bold text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
           <Globe size={14} className="text-primary icon-animate" /> หุ้นยอดนิยม
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -110,7 +110,7 @@ export default function HomePage() {
       </section>
 
       <section>
-        <h3 className="text-xs font-bold text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-4 flex items-center gap-2">
           <TrendingUp size={14} className="text-primary icon-animate" />
           สัญญาณจากระบบ
         </h3>
@@ -170,11 +170,11 @@ function StockCard({ symbol, name, market }) {
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-          <span className="text-[10px] font-mono text-muted bg-surface px-1.5 py-0.5 rounded border border-border shrink-0">{market}</span>
+          <span className="text-xs font-mono text-muted bg-surface px-1.5 py-0.5 rounded border border-border shrink-0">{market}</span>
           {quote?.market_state && <MarketStateBadge marketState={quote.market_state} compact />}
         </div>
         {quote && (
-          <span className={`text-[10px] font-bold flex items-center shrink-0 ${isUp ? 'text-success' : 'text-danger'}`}>
+          <span className={`text-xs font-bold flex items-center shrink-0 ${isUp ? 'text-success' : 'text-danger'}`}>
             {isUp ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
             {quote.change_percent?.toFixed(2)}%
           </span>
@@ -183,14 +183,14 @@ function StockCard({ symbol, name, market }) {
 
       <div className="flex-1 min-w-0 pr-1">
         <p className="font-bold text-foreground group-hover:text-primary transition-colors truncate">{name}</p>
-        <p className="text-[10px] font-mono text-muted">{symbol}</p>
+        <p className="text-xs font-mono text-muted">{symbol}</p>
       </div>
 
       <div className="flex items-end justify-between mt-2 gap-2">
         {quote ? (
           <p className="text-sm font-mono font-bold text-foreground">
             {quote.price?.toLocaleString()}
-            <span className="text-[10px] text-muted font-normal ml-1">{quote.currency}</span>
+            <span className="text-xs text-muted font-normal ml-1">{quote.currency}</span>
           </p>
         ) : (
           <span className="text-xs text-muted">...</span>

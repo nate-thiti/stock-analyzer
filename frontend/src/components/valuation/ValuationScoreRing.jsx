@@ -39,11 +39,11 @@ export default function ValuationScoreRing({ grade, pe, peg }) {
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className={`text-2xl font-black ${meta.color}`}>{score}</span>
-          <span className="text-[10px] text-muted uppercase tracking-wider">Score</span>
+          <span className="text-xs text-muted uppercase tracking-wider">Score</span>
         </div>
       </div>
       <p className={`mt-2 text-sm font-bold ${meta.color}`}>{meta.label}</p>
-      <p className="text-[10px] text-muted mt-0.5 text-center">
+      <p className="text-xs text-muted mt-0.5 text-center">
         P/E {pe?.toFixed(1) ?? '-'} • PEG {peg?.toFixed(2) ?? '-'}
       </p>
     </div>

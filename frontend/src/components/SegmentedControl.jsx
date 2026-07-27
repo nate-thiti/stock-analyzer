@@ -6,7 +6,7 @@ export default function SegmentedControl({
   size = 'sm',
   fullWidth = false,
 }) {
-  const pad = size === 'sm' ? 'py-1.5 px-3 text-[11px]' : 'py-2 px-3 text-xs';
+  const pad = size === 'sm' ? 'py-1.5 px-3 text-sm' : 'py-2 px-3 text-xs';
 
   return (
     <div

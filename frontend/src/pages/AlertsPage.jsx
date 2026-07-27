@@ -71,7 +71,7 @@ export default function AlertsPage() {
     <div className="space-y-6 w-full min-w-0 max-w-6xl mx-auto">
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
+          <h2 className="text-2xl sm:text-3xl font-black text-foreground flex items-center gap-2">
             <Bell size={24} className="text-primary" />
             แจ้งเตือนราคา
           </h2>
@@ -108,7 +108,7 @@ export default function AlertsPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-3 lg:gap-4 lg:items-end">
           <div>
-            <label className="text-[10px] font-bold text-muted uppercase">สัญลักษณ์</label>
+            <label className="text-xs font-bold text-muted uppercase">สัญลักษณ์</label>
             <input
               type="text"
               value={form.symbol}
@@ -128,7 +128,7 @@ export default function AlertsPage() {
             ]}
           />
           <div>
-            <label className="text-[10px] font-bold text-muted uppercase">ราคาเป้า</label>
+            <label className="text-xs font-bold text-muted uppercase">ราคาเป้า</label>
             <input
               type="number"
               step="any"
@@ -185,7 +185,7 @@ export default function AlertsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm lg:table-fixed">
               <thead>
-                <tr className="border-b border-border/40 text-[10px] text-muted uppercase bg-surface/30">
+                <tr className="border-b border-border/40 text-xs text-muted uppercase bg-surface/30">
                   <th className="text-left py-3 px-4 lg:px-6 w-[14%]">หุ้น</th>
                   <th className="text-left py-3 px-4 lg:px-6 w-[22%]">เงื่อนไข</th>
                   <th className="text-right py-3 px-4 lg:px-6 w-[24%]">ราคาปัจจุบัน</th>
@@ -210,7 +210,7 @@ function StatCard({ label, value, accent }) {
   const color = accent === 'warning' ? 'text-warning' : accent === 'primary' ? 'text-primary' : 'text-foreground';
   return (
     <div className="glass-card rounded-xl px-3 py-2.5 lg:py-3 text-center min-w-0">
-      <p className="text-[10px] text-muted uppercase truncate">{label}</p>
+      <p className="text-xs text-muted uppercase truncate">{label}</p>
       <p className={`text-xl lg:text-2xl font-black mt-0.5 ${color}`}>{value}</p>
     </div>
   );
@@ -290,14 +290,14 @@ function AlertRow({ alert: a, onDelete, deleting }) {
           <>
             <span className={`font-bold ${priceColor}`}>{formatMoney(a.current_price, cur)}</span>
             {a.change_percent != null && (
-              <p className={`text-[10px] mt-0.5 font-semibold ${priceColor}`}>
+              <p className={`text-xs mt-0.5 font-semibold ${priceColor}`}>
                 {formatSignedPct(a.change_percent)}
               </p>
             )}
           </>
         ) : '—'}
         {distance && !a.triggered && (
-          <p className={`text-[10px] mt-0.5 flex items-center justify-end gap-0.5 ${distanceColorClass(distance.pct, distance.atTarget)}`}>
+          <p className={`text-xs mt-0.5 flex items-center justify-end gap-0.5 ${distanceColorClass(distance.pct, distance.atTarget)}`}>
             {distance.move === 'up' ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
             {distance.label}
           </p>
@@ -305,11 +305,11 @@ function AlertRow({ alert: a, onDelete, deleting }) {
       </td>
       <td className="py-3.5 px-4 lg:px-6 text-center">
         {a.triggered ? (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-warning/15 border border-warning/30 text-warning text-[10px] font-bold">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-warning/15 border border-warning/30 text-warning text-xs font-bold">
             <BellRing size={10} /> ถึงแล้ว
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 border border-primary/25 text-primary text-[10px] font-bold">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 border border-primary/25 text-primary text-xs font-bold">
             <Bell size={10} /> เฝ้าอยู่
           </span>
         )}

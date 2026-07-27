@@ -199,7 +199,7 @@ export default function ComparePage() {
   return (
     <div className="space-y-6 w-full min-w-0">
       <div>
-        <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
+        <h2 className="text-2xl sm:text-3xl font-black text-foreground flex items-center gap-2">
           <GitCompare size={24} className="text-primary" />
           เปรียบเทียบหุ้น
         </h2>
@@ -229,7 +229,7 @@ export default function ComparePage() {
             </span>
           ))}
           {symbols.length > 0 && symbols.length < MAX_STOCKS && (
-            <span className="text-[10px] text-muted">{symbols.length}/{MAX_STOCKS}</span>
+            <span className="text-xs text-muted">{symbols.length}/{MAX_STOCKS}</span>
           )}
         </div>
 
@@ -267,13 +267,13 @@ export default function ComparePage() {
         </form>
 
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-0.5 px-0.5 sm:flex-wrap sm:overflow-visible">
-          <span className="text-[10px] text-muted self-center mr-1 shrink-0">Preset:</span>
+          <span className="text-xs text-muted self-center mr-1 shrink-0">Preset:</span>
           {PRESETS.map((preset) => (
             <button
               key={preset.label}
               type="button"
               onClick={() => previewPreset(preset)}
-              className={`px-3 py-1.5 border rounded-lg text-[11px] font-medium transition-colors shrink-0 whitespace-nowrap ${
+              className={`px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap ${
                 activePreset === preset.label
                   ? 'bg-primary/10 border-primary text-primary'
                   : 'bg-surface border-border text-muted hover:border-primary hover:text-primary'
@@ -289,7 +289,7 @@ export default function ComparePage() {
                 const p = PRESETS.find((x) => x.label === activePreset);
                 if (p) addAllFromPreset(p);
               }}
-              className="px-3 py-1.5 border border-primary/40 rounded-lg text-[11px] font-medium text-primary bg-primary/5 hover:bg-primary/10 shrink-0 whitespace-nowrap"
+              className="px-3 py-1.5 border border-primary/40 rounded-lg text-sm font-medium text-primary bg-primary/5 hover:bg-primary/10 shrink-0 whitespace-nowrap"
             >
               + เลือกหุ้นจาก {activePreset}
             </button>
@@ -297,7 +297,7 @@ export default function ComparePage() {
         </div>
 
         <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border/40">
-          <span className="text-[10px] text-muted self-center mr-1 w-full sm:w-auto">
+          <span className="text-xs text-muted self-center mr-1 w-full sm:w-auto">
             เพิ่มด่วน{activePreset ? ` (${activePreset})` : ''}:
           </span>
           {quickAddItems.map(({ symbol }) => (
@@ -306,7 +306,7 @@ export default function ComparePage() {
               type="button"
               onClick={() => addSymbol(symbol)}
               disabled={symbols.includes(symbol) || symbols.length >= MAX_STOCKS}
-              className="px-2 py-1 rounded-md text-[10px] font-mono bg-surface/60 border border-border/40 text-muted hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="px-2 py-1 rounded-md text-xs font-mono bg-surface/60 border border-border/40 text-muted hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               +{symbol}
             </button>
@@ -404,12 +404,12 @@ export default function ComparePage() {
               <div className="px-5 pb-5 space-y-5 border-t border-border/40">
                 {METRIC_GROUPS.map((group) => (
                   <div key={group.title}>
-                    <h4 className="text-[10px] font-bold text-primary uppercase mb-2">{group.title}</h4>
+                    <h4 className="text-xs font-bold text-primary uppercase mb-2">{group.title}</h4>
                     <div className="overflow-x-auto rounded-xl border border-border/40">
                       <table className="w-full text-sm border-collapse">
                         <thead>
                           <tr className="bg-surface/60 border-b border-border/40">
-                            <th className="text-left py-2 px-3 text-[10px] text-muted font-bold">{group.title}</th>
+                            <th className="text-left py-2 px-3 text-xs text-muted font-bold">{group.title}</th>
                             {validResults.map((r) => (
                               <th key={r.symbol} className="text-center py-2 px-3 text-xs font-mono font-bold text-foreground">
                                 {r.symbol}
@@ -420,7 +420,7 @@ export default function ComparePage() {
                         <tbody>
                           {group.rows.map((row) => (
                             <tr key={row.label} className="border-b border-border/30 last:border-0">
-                              <td className="py-2 px-3 text-[11px] text-muted">{row.label}</td>
+                              <td className="py-2 px-3 text-sm text-muted">{row.label}</td>
                               {validResults.map((r) => (
                                 <td key={r.symbol} className="py-2 px-3 text-center text-xs font-mono text-foreground">
                                   {row.get(r) ?? '-'}
@@ -457,7 +457,7 @@ function CompareStockCard({ result: r, isBest }) {
       }`}
     >
       {isBest && (
-        <span className="absolute -top-2 -right-2 bg-success text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+        <span className="absolute -top-2 -right-2 bg-success text-white text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
           <Trophy size={10} /> Best
         </span>
       )}
@@ -476,7 +476,7 @@ function CompareStockCard({ result: r, isBest }) {
         <span className={`text-sm font-black ${style.text}`}>
           {ACTION_LABELS[r.recommendation] || r.recommendation}
         </span>
-        <span className="text-[10px] text-muted">
+        <span className="text-xs text-muted">
           {(r.confidence * 100).toFixed(0)}%
         </span>
       </div>
@@ -487,13 +487,13 @@ function CompareStockCard({ result: r, isBest }) {
         <MiniStat label="P/S" value={r.fundamental?.ps_ratio?.toFixed(1)} />
       </div>
 
-      <div className="flex items-center justify-between text-[11px] pt-3 border-t border-border/40">
+      <div className="flex items-center justify-between text-sm pt-3 border-t border-border/40">
         <span className={grade.color}>{grade.label}</span>
         <span className={`font-semibold uppercase ${trendColor}`}>{trend}</span>
       </div>
 
       {r.trading_plan && (
-        <p className="text-[10px] text-muted mt-2 font-mono">
+        <p className="text-xs text-muted mt-2 font-mono">
           SL {formatMoney(r.trading_plan.stop_loss, r.currency)} → Target {formatMoney(r.trading_plan.target_price, r.currency)}
         </p>
       )}
@@ -504,7 +504,7 @@ function CompareStockCard({ result: r, isBest }) {
 function MiniStat({ label, value }) {
   return (
     <div className="bg-surface/50 rounded-lg py-1.5 px-2 text-center border border-border/30">
-      <p className="text-[9px] text-muted uppercase">{label}</p>
+      <p className="text-xs text-muted uppercase">{label}</p>
       <p className="text-xs font-mono font-bold text-foreground mt-0.5">{value || '-'}</p>
     </div>
   );

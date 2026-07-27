@@ -24,7 +24,7 @@ function ChangeBadge({ change, changePercent, currency, size = 'md' }) {
   const compact = size === 'sm';
   return (
     <span className={`inline-flex items-center font-semibold rounded-lg border ${
-      compact ? 'text-[10px] px-1.5 py-0.5 gap-0.5' : 'text-xs px-2 py-1 gap-0.5'
+      compact ? 'text-xs px-1.5 py-0.5 gap-0.5' : 'text-xs px-2 py-1 gap-0.5'
     } ${up ? 'bg-success/5 border-success/20 text-success' : 'bg-danger/5 border-danger/20 text-danger'}`}>
       {up ? <ArrowUpRight size={compact ? 11 : 14} /> : <ArrowDownRight size={compact ? 11 : 14} />}
       {change >= 0 ? '+' : ''}{change?.toFixed(2)}
@@ -38,9 +38,9 @@ function ExtendedPriceInline({ label, price, change, changePercent, currency }) 
   if (price == null) return null;
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-      <span className="text-[10px] font-bold uppercase text-warning/90 whitespace-nowrap">{label}</span>
+      <span className="text-xs font-bold uppercase text-warning/90 whitespace-nowrap">{label}</span>
       <span className="text-sm sm:text-base font-bold text-foreground">{price.toLocaleString()}</span>
-      <span className="text-[10px] text-muted uppercase">{currency}</span>
+      <span className="text-xs text-muted uppercase">{currency}</span>
       {change != null && changePercent != null && (
         <ChangeBadge change={change} changePercent={changePercent} currency={currency} size="sm" />
       )}
@@ -243,7 +243,7 @@ export default function StockPage() {
               {quote ? (
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
-                    <h2 className="text-xl sm:text-2xl font-black text-foreground">{quote.symbol}</h2>
+                    <h2 className="text-2xl sm:text-3xl font-black text-foreground">{quote.symbol}</h2>
                     {quote.market_state && <MarketStateBadge marketState={quote.market_state} />}
                     <StarButton symbol={quote.symbol} />
                     <PriceAlertButton
@@ -258,8 +258,8 @@ export default function StockPage() {
                     <p className="text-xs sm:text-sm text-muted truncate mb-2">{quote.name}</p>
                   )}
                   <div className="flex flex-wrap items-baseline gap-x-2 sm:gap-x-3 gap-y-2">
-                    <span className="text-2xl sm:text-3xl font-black">{quote.price?.toLocaleString()}</span>
-                    <span className="text-xs text-muted uppercase">{currency}</span>
+                    <span className="text-3xl sm:text-4xl font-black">{quote.price?.toLocaleString()}</span>
+                    <span className="text-sm text-muted uppercase">{currency}</span>
                     <ChangeBadge change={quote.change} changePercent={quote.change_percent} currency={currency} />
                     {(quote.pre_market_price != null || quote.post_market_price != null) && (
                       <>
@@ -296,18 +296,18 @@ export default function StockPage() {
                   {!quote.pre_market_price && !quote.post_market_price
                     && !quote.symbol.includes('.')
                     && ['CLOSED', 'PREPRE', 'POSTPOST'].includes(quote.market_state) && (
-                    <p className="mt-2 text-[10px] text-muted/80 leading-relaxed border-t border-border/20 pt-2">
+                    <p className="mt-2 text-xs text-muted/80 leading-relaxed border-t border-border/20 pt-2">
                       ราคาก่อนตลาดเปิดจะแสดงเมื่อเริ่มซื้อขายนอกเวลา (~21:00–03:30 น. ไทย)
                     </p>
                   )}
                   {(quote.market_state === 'PRE' || quote.market_state === 'POST')
                     && !quote.pre_market_price && !quote.post_market_price && (
-                    <p className="mt-2 text-[10px] text-warning/90">
+                    <p className="mt-2 text-xs text-warning/90">
                       อยู่ช่วง{quote.market_state === 'POST' ? POST_MARKET_LABEL : EXTENDED_HOURS_LABEL} แต่ Yahoo ยังไม่ส่งราคา — ลอง refresh อีกครั้ง
                     </p>
                   )}
                   {marketUpdate && (
-                    <div className="mt-2 space-y-1 text-[11px] text-muted">
+                    <div className="mt-2 space-y-1 text-sm text-muted">
                       <p className="flex items-center gap-1.5 flex-wrap">
                         <Clock size={12} className="text-primary shrink-0" />
                         <span>
@@ -386,7 +386,7 @@ export default function StockPage() {
                   exchangeTimezone={quote?.exchange_timezone}
                 />
                 {chartLastBar && (
-                  <p className="mt-2 text-[10px] text-muted text-right">
+                  <p className="mt-2 text-xs text-muted text-right">
                     แท่งล่าสุด: {chartLastBar}
                     {isDailyChartInterval(candleInterval) && (
                       <span className="text-muted/70"> (วันซื้อขาย)</span>
@@ -416,7 +416,7 @@ export default function StockPage() {
             {info.summary ? (
               <p className="text-xs text-muted leading-relaxed flex-1 min-h-0 overflow-y-auto">{info.summary}</p>
             ) : (
-              <p className="text-[10px] text-muted/80 italic">Yahoo ยังไม่ส่งข้อมูลสรุปธุรกิจ — ลอง refresh หรือกลับมาใหม่ภายหลัง</p>
+              <p className="text-xs text-muted/80 italic">Yahoo ยังไม่ส่งข้อมูลสรุปธุรกิจ — ลอง refresh หรือกลับมาใหม่ภายหลัง</p>
             )}
           </div>
         )}
@@ -466,7 +466,7 @@ export default function StockPage() {
 function InfoItem({ icon, label, value }) {
   return (
     <div className="bg-surface/40 p-2.5 rounded-xl border border-border/30">
-      <p className="text-[10px] text-muted flex items-center gap-1">{icon} {label}</p>
+      <p className="text-xs text-muted flex items-center gap-1">{icon} {label}</p>
       <p className="text-xs font-semibold text-foreground mt-0.5 truncate">{value || '-'}</p>
     </div>
   );

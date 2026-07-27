@@ -41,12 +41,12 @@ export default function QuarterlyFundamentalsChart({ quarters, large = false }) 
                   title={`EPS ${q.eps?.toFixed(2) ?? '-'}`}
                 />
               </div>
-              <p className={`text-muted mt-1 truncate w-full text-center ${large ? 'text-[10px]' : 'text-[8px]'}`}>{q.fiscal_date?.slice(0, 7)}</p>
+              <p className={`text-muted mt-1 truncate w-full text-center ${large ? 'text-xs' : 'text-xs'}`}>{q.fiscal_date?.slice(0, 7)}</p>
             </div>
           );
         })}
       </div>
-      <div className="flex gap-4 text-[10px] text-muted justify-center">
+      <div className="flex gap-4 text-xs text-muted justify-center">
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-primary/70" /> Revenue</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-success/70" /> EPS</span>
       </div>

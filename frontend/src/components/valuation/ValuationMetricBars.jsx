@@ -47,7 +47,7 @@ export default function ValuationMetricBars({ fundamental }) {
         const color = zoneColor(value, benchmark, invert, pct);
         return (
           <div key={key}>
-            <div className="flex items-center justify-between text-[10px] mb-1">
+            <div className="flex items-center justify-between text-xs mb-1">
               <span className="font-bold text-muted uppercase">{label}</span>
               <span className="font-mono font-bold text-foreground">{fmt(value, pct)}</span>
             </div>
@@ -57,7 +57,7 @@ export default function ValuationMetricBars({ fundamental }) {
                 style={{ width: `${width}%`, opacity: 0.85 }}
               />
             </div>
-            <p className="text-[9px] text-muted mt-0.5">
+            <p className="text-xs text-muted mt-0.5">
               benchmark {invert ? '≤' : '≥'} {pct ? formatPct(benchmark) : benchmark}
             </p>
           </div>

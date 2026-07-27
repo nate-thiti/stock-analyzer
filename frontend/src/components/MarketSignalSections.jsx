@@ -89,7 +89,7 @@ export default function MarketSignalSections() {
               { value: 'personal', label: 'รายการโปรด', icon: Star },
             ]}
           />
-          <p className="text-[11px] text-muted shrink-0">
+          <p className="text-sm text-muted shrink-0">
             สแกน {data?.scanned} ตัว
             {data?.updated_at && <span> • อัปเดต {formatUpdated(data.updated_at)}</span>}
             <span className="text-primary/70 ml-1">• auto 15m</span>
@@ -99,7 +99,7 @@ export default function MarketSignalSections() {
           type="button"
           onClick={() => load(true)}
           disabled={refreshing}
-          className="flex items-center gap-1.5 text-[11px] text-primary hover:underline disabled:opacity-50"
+          className="flex items-center gap-1.5 text-sm text-primary hover:underline disabled:opacity-50"
         >
           <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
           รีเฟรช
@@ -151,24 +151,24 @@ function SignalCard({ item }) {
       className={`glass-card rounded-2xl p-4 group flex flex-col min-h-[130px] border ${style.border} hover:border-primary/40 transition-all`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="text-[10px] font-mono text-muted bg-surface px-1.5 py-0.5 rounded border border-border shrink-0">{market}</span>
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>
+        <span className="text-xs font-mono text-muted bg-surface px-1.5 py-0.5 rounded border border-border shrink-0">{market}</span>
+        <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>
           {item.signal_tier_label || actionLabel} {(item.confidence * 100).toFixed(0)}%
         </span>
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-bold text-foreground group-hover:text-primary transition-colors truncate">{item.name || item.symbol}</p>
-        <p className="text-[10px] font-mono text-muted">{item.symbol}</p>
-        <p className="text-[10px] text-muted mt-1">Score {item.score >= 0 ? '+' : ''}{item.score?.toFixed(2)}</p>
+        <p className="text-xs font-mono text-muted">{item.symbol}</p>
+        <p className="text-xs text-muted mt-1">Score {item.score >= 0 ? '+' : ''}{item.score?.toFixed(2)}</p>
       </div>
       <div className="flex items-end justify-between mt-2 gap-2">
         <div>
           <p className="text-sm font-mono font-bold text-foreground">
             {item.current_price?.toLocaleString()}
-            <span className="text-[10px] text-muted font-normal ml-1">{item.currency}</span>
+            <span className="text-xs text-muted font-normal ml-1">{item.currency}</span>
           </p>
           {item.change_percent != null && (
-            <span className={`text-[10px] font-bold flex items-center ${isUp ? 'text-success' : 'text-danger'}`}>
+            <span className={`text-xs font-bold flex items-center ${isUp ? 'text-success' : 'text-danger'}`}>
               {isUp ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
               {item.change_percent?.toFixed(2)}%
             </span>

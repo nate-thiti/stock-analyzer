@@ -89,7 +89,7 @@ export default function PortfolioPage() {
   return (
     <div className="space-y-6 w-full min-w-0">
       <div>
-        <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
+        <h2 className="text-2xl sm:text-3xl font-black text-foreground flex items-center gap-2">
           <Briefcase size={24} className="text-primary" />
           พอร์ตของฉัน
         </h2>
@@ -174,16 +174,16 @@ export default function PortfolioPage() {
           <div className="p-8 text-center text-sm text-muted">ยังไม่มีหุ้นในพอร์ต — เพิ่มด้านบน</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm sm:text-base">
               <thead>
                 <tr className="border-b border-border/40 bg-surface/40">
-                  <th className="text-left py-3 px-4 text-[10px] text-muted uppercase">หุ้น</th>
-                  <th className="text-right py-3 px-4 text-[10px] text-muted uppercase">จำนวน</th>
-                  <th className="text-right py-3 px-4 text-[10px] text-muted uppercase">ทุนเฉลี่ย</th>
-                  <th className="text-right py-3 px-4 text-[10px] text-muted uppercase">ราคาปัจจุบัน</th>
-                  <th className="text-right py-3 px-4 text-[10px] text-muted uppercase">มูลค่า</th>
-                  <th className="text-right py-3 px-4 text-[10px] text-muted uppercase">P/L</th>
-                  <th className="text-right py-3 px-4 text-[10px] text-muted uppercase">จัดการ</th>
+                  <th className="text-left py-3 px-4 text-xs sm:text-sm text-muted uppercase">หุ้น</th>
+                  <th className="text-right py-3 px-4 text-xs sm:text-sm text-muted uppercase">จำนวน</th>
+                  <th className="text-right py-3 px-4 text-xs sm:text-sm text-muted uppercase">ทุนเฉลี่ย</th>
+                  <th className="text-right py-3 px-4 text-xs sm:text-sm text-muted uppercase">ราคาปัจจุบัน</th>
+                  <th className="text-right py-3 px-4 text-xs sm:text-sm text-muted uppercase">มูลค่า</th>
+                  <th className="text-right py-3 px-4 text-xs sm:text-sm text-muted uppercase">P/L</th>
+                  <th className="text-right py-3 px-4 text-xs sm:text-sm text-muted uppercase">จัดการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -250,8 +250,8 @@ function SummaryCard({ label, value, suffix, currency, positive }) {
   const color = positive === undefined ? 'text-foreground' : positive ? 'text-success' : 'text-danger';
   return (
     <div className="glass-card rounded-xl p-4">
-      <p className="text-[10px] text-muted uppercase">{label}</p>
-      <p className={`text-lg font-black mt-1 ${color}`}>
+      <p className="text-sm text-muted uppercase">{label}</p>
+      <p className={`text-xl sm:text-2xl font-black mt-1 ${color}`}>
         {value}
         {currency && <span className="text-xs font-bold text-muted uppercase ml-1">{currency}</span>}
         {suffix && <span className="text-sm font-bold opacity-80 ml-1">{suffix}</span>}
@@ -263,7 +263,7 @@ function SummaryCard({ label, value, suffix, currency, positive }) {
 function Field({ label, value, onChange, type = 'text', placeholder, required, step, compact }) {
   return (
     <div className={compact ? 'min-w-[120px]' : ''}>
-      <label className="text-[10px] font-bold text-muted uppercase">{label}</label>
+      <label className="text-sm font-bold text-muted uppercase">{label}</label>
       <input
         type={type}
         step={step}
@@ -271,7 +271,7 @@ function Field({ label, value, onChange, type = 'text', placeholder, required, s
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
-        className="w-full mt-1 bg-surface border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary"
+        className="w-full mt-1 bg-surface border border-border rounded-xl px-3 py-2.5 text-base focus:outline-none focus:border-primary"
       />
     </div>
   );

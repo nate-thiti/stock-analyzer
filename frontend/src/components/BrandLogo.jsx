@@ -56,7 +56,7 @@ export function BrandLockup({ iconSize = 36, subtitle = 'Global Markets', classN
           <span className="text-gradient">Stock</span> Analyzer
         </p>
         {subtitle && (
-          <p className="text-[9px] text-muted font-mono uppercase tracking-widest truncate">
+          <p className="text-xs text-muted font-mono uppercase tracking-widest truncate">
             {subtitle}
           </p>
         )}
