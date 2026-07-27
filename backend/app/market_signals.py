@@ -14,6 +14,7 @@ from .analysis import (
     calculate_trend_analysis,
 )
 from .risk import generate_recommendation
+from .personalized_risk import classify_signal_tier, signal_tier_label
 from .models import WatchlistItem, Favorite
 from .init_db import DEFAULT_WATCHLIST
 
@@ -78,7 +79,16 @@ def _analyze_one(symbol: str) -> Optional[SignalItem]:
         rec = generate_recommendation(fundamental, technical, trend, current_price)
 
         action = rec["action"]
-        if action not in ("buy", "hold", "sell"):
+        score = rec["score"]
+        tier = classify_signal_tier(score)
+        if tier in ("strong_buy", "lean_buy"):
+            display_action = "buy"
+        elif tier in ("strong_sell", "lean_sell"):
+            display_action = "sell"
+        else:
+            display_action = "hold"
+
+        if display_action not in ("buy", "hold", "sell"):
             return None
 
         return SignalItem(
@@ -87,9 +97,11 @@ def _analyze_one(symbol: str) -> Optional[SignalItem]:
             current_price=current_price,
             currency=currency,
             change_percent=quote.change_percent if quote else None,
-            recommendation=action,
+            recommendation=display_action,
             confidence=rec["confidence"],
-            score=rec["score"],
+            score=score,
+            signal_tier=tier,
+            signal_tier_label=signal_tier_label(tier),
         )
     except Exception as e:
         print(f"Signal skip {symbol}: {e}")
@@ -123,23 +135,35 @@ def get_market_signals(
                 items.append(result)
 
     buy = sorted(
-        [i for i in items if i.recommendation == "buy"],
+        [i for i in items if i.signal_tier == "strong_buy"],
+        key=lambda x: (x.confidence, x.score),
+        reverse=True,
+    )
+    lean_buy = sorted(
+        [i for i in items if i.signal_tier == "lean_buy"],
         key=lambda x: (x.confidence, x.score),
         reverse=True,
     )
     hold = sorted(
-        [i for i in items if i.recommendation == "hold"],
+        [i for i in items if i.signal_tier == "hold"],
         key=lambda x: abs(x.score),
     )
+    lean_sell = sorted(
+        [i for i in items if i.signal_tier == "lean_sell"],
+        key=lambda x: (x.confidence, abs(x.score)),
+        reverse=True,
+    )
     sell = sorted(
-        [i for i in items if i.recommendation == "sell"],
+        [i for i in items if i.signal_tier == "strong_sell"],
         key=lambda x: (x.confidence, abs(x.score)),
         reverse=True,
     )
 
     payload = MarketSignalsResponse(
         buy=buy,
+        lean_buy=lean_buy,
         hold=hold,
+        lean_sell=lean_sell,
         sell=sell,
         scanned=len(watchlist),
         updated_at=datetime.now(timezone.utc).isoformat(),

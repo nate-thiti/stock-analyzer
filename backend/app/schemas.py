@@ -141,6 +141,25 @@ class TradingPlan(BaseModel):
     technical_notes: List[str] = []
     risk_notes: List[str] = []
 
+
+class PersonalizedRiskOut(BaseModel):
+    action: str
+    action_label: str
+    summary: str
+    max_loss_tolerance_pct: float
+    max_position_pct: float = 10.0
+    current_loss_pct: Optional[float] = None
+    risk_usage_pct: Optional[float] = None
+    risk_usage_band: Optional[str] = None
+    personal_risk_floor: Optional[float] = None
+    technical_stop: Optional[float] = None
+    effective_stop: Optional[float] = None
+    position_pct: Optional[float] = None
+    technical_stop_breached: bool = False
+    has_position: bool = False
+    notes: List[str] = []
+
+
 class AnalysisResponse(BaseModel):
     symbol: str
     current_price: Optional[float] = None
@@ -151,6 +170,7 @@ class AnalysisResponse(BaseModel):
     recommendation: Optional[str] = None
     confidence: Optional[float] = None
     trading_plan: Optional[TradingPlan] = None
+    personalized_risk: Optional[PersonalizedRiskOut] = None
 
 class ComparisonResponse(BaseModel):
     symbols: List[str]
@@ -168,12 +188,16 @@ class SignalItem(BaseModel):
     recommendation: str
     confidence: float = 0
     score: float = 0
+    signal_tier: str = "hold"
+    signal_tier_label: str = "ถือ/รอดู"
 
 
 class MarketSignalsResponse(BaseModel):
     buy: List[SignalItem] = []
     hold: List[SignalItem] = []
     sell: List[SignalItem] = []
+    lean_buy: List[SignalItem] = []
+    lean_sell: List[SignalItem] = []
     scanned: int = 0
     updated_at: str = ""
     scope_used: str = "global"

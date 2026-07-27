@@ -1,6 +1,7 @@
 import os
 import sys
 from sqlalchemy.orm import Session
+from sqlalchemy import inspect, text
 from .database import Base, engine, SessionLocal, DATABASE_URL
 from .models import User, WatchlistItem
 from .auth import hash_password
@@ -21,6 +22,7 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
+        _migrate_user_risk_columns()
         _seed_superadmin(db)
         _seed_watchlist(db)
     finally:
@@ -63,6 +65,31 @@ def _warn_insecure_defaults():
         print("⚠️  WARNING: JWT_SECRET is using default value — change before production!")
     if pwd == "admin1234":
         print("⚠️  WARNING: SUPERADMIN_PASSWORD is default — change before production!")
+
+
+def _migrate_user_risk_columns():
+    """Add risk profile columns to existing deployments (create_all won't alter tables)."""
+    insp = inspect(engine)
+    if "users" not in insp.get_table_names():
+        return
+    existing = {c["name"] for c in insp.get_columns("users")}
+    additions = [
+        ("max_loss_tolerance_pct", "FLOAT", None),
+        ("max_position_pct", "FLOAT", "10.0"),
+        ("account_size", "FLOAT", "100000.0"),
+        ("risk_per_trade_pct", "FLOAT", "2.0"),
+    ]
+    with engine.begin() as conn:
+        for name, col_type, default in additions:
+            if name in existing:
+                continue
+            if DATABASE_URL.startswith("sqlite"):
+                conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {col_type}"))
+            else:
+                default_sql = f" DEFAULT {default}" if default is not None else ""
+                conn.execute(text(
+                    f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {name} {col_type}{default_sql}"
+                ))
 
 
 def _seed_superadmin(db: Session):

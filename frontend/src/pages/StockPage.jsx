@@ -174,7 +174,7 @@ export default function StockPage() {
       .then((i) => { if (i) setInfo(i); })
       .catch((err) => setError(err.message))
       .finally(() => setAnalysisLoading(false));
-  }, [symbol, period, candleInterval]);
+  }, [symbol, period, candleInterval, position?.id, position?.shares, position?.avg_cost]);
 
   const currency = quote?.currency || analysis?.currency || 'USD';
   const chartPriceRange = useMemo(() => computeHistoryPriceRange(history), [history]);
@@ -451,6 +451,7 @@ export default function StockPage() {
           currency={currency}
           planLoading={analysisLoading}
           position={position}
+          personalizedRisk={analysis.personalized_risk}
         />
       )}
     </div>

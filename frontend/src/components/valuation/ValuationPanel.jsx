@@ -30,6 +30,7 @@ export default function ValuationPanel({
   currency,
   planLoading,
   position,
+  personalizedRisk,
 }) {
   if (!fundamental) return null;
 
@@ -109,7 +110,13 @@ export default function ValuationPanel({
               รอผลวิเคราะห์...
             </div>
           ) : tradingPlan ? (
-            <TradingPlanPanel plan={tradingPlan} currency={currency} embedded position={position} />
+            <TradingPlanPanel
+              plan={tradingPlan}
+              currency={currency}
+              embedded
+              position={position}
+              personalizedRisk={personalizedRisk}
+            />
           ) : null}
         </aside>
       </div>

@@ -33,7 +33,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(username.trim(), email.trim(), password);
-      navigate(from, { replace: true });
+      navigate(from, { replace: true, state: { setupRisk: true } });
     } catch (err) {
       setError(err.message || 'สมัครสมาชิกไม่สำเร็จ');
     } finally {

@@ -13,6 +13,7 @@ import FavoritesPage from './pages/FavoritesPage';
 import PortfolioPage from './pages/PortfolioPage';
 import AlertsPage from './pages/AlertsPage';
 import GuidePage from './pages/GuidePage';
+import SettingsPage from './pages/SettingsPage';
 
 const AnimatedBackground = lazy(() => import('./components/AnimatedBackground'));
 
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="portfolio" element={<ErrorBoundary><PortfolioPage /></ErrorBoundary>} />
           <Route path="alerts" element={<ErrorBoundary><AlertsPage /></ErrorBoundary>} />
           <Route path="guide" element={<ErrorBoundary><GuidePage /></ErrorBoundary>} />
+          <Route path="settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />
           <Route path="admin" element={<SuperAdminRoute><ErrorBoundary><AdminPage /></ErrorBoundary></SuperAdminRoute>} />
           </Route>
         </Route>

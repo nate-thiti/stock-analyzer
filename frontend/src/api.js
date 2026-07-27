@@ -51,6 +51,10 @@ export const api = {
   logout: () => fetchJSON('/auth/logout', { method: 'POST' }),
   me: () => fetchJSON('/auth/me'),
 
+  getRiskProfile: () => fetchJSON('/me/risk-profile'),
+  updateRiskProfile: (data) =>
+    fetchJSON('/me/risk-profile', { method: 'PATCH', body: JSON.stringify(data) }),
+
   listUsers: () => fetchJSON('/users'),
   createUser: (data) => fetchJSON('/users', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id, data) => fetchJSON(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

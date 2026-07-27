@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import {
   BarChart3, GitCompare, Home, Star, Shield,
-  LogOut, User, Menu, X, Briefcase, Bell, BellRing, BookOpen,
+  LogOut, User, Menu, X, Briefcase, Bell, BellRing, BookOpen, Settings,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import SupportButton from './SupportButton';
@@ -23,6 +23,7 @@ export default function Layout() {
     { to: '/favorites', label: 'ติดดาว', icon: Star },
     { to: '/alerts', label: 'แจ้งเตือน', icon: Bell },
     { to: '/compare', label: 'เปรียบเทียบ', icon: GitCompare },
+    { to: '/settings', label: 'ตั้งค่า', icon: Settings },
     { to: '/guide', label: 'คู่มือ', icon: BookOpen },
   ];
 

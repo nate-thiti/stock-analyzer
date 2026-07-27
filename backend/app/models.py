@@ -18,6 +18,11 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(32), default="user")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
+    max_loss_tolerance_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_position_pct: Mapped[float] = mapped_column(Float, default=10.0)
+    account_size: Mapped[float] = mapped_column(Float, default=100_000.0)
+    risk_per_trade_pct: Mapped[float] = mapped_column(Float, default=2.0)
+
     favorites: Mapped[list["Favorite"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     positions: Mapped[list["Position"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     price_alerts: Mapped[list["PriceAlert"]] = relationship(back_populates="user", cascade="all, delete-orphan")

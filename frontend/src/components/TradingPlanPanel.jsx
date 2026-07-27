@@ -1,12 +1,6 @@
-import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Activity, Shield, Target, Wallet, Layers, Calendar, AlertCircle, Package, ShoppingCart } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, Target, Wallet, Layers, Calendar, AlertCircle, Package, ShoppingCart } from 'lucide-react';
 import { ACTION_STYLES, formatMoney, formatPnl } from '../api';
-import SegmentedControl from './SegmentedControl';
-
-const POSITION_MODES = {
-  holding: { id: 'holding', label: 'ถืออยู่แล้ว', icon: Package },
-  new: { id: 'new', label: 'ยังไม่ได้ซื้อ', icon: ShoppingCart },
-};
+import PersonalRiskPanel from './PersonalRiskPanel';
 
 const POSITION_GUIDANCE = {
   holding: {
@@ -43,6 +37,19 @@ const POSITION_GUIDANCE = {
       style: 'hold',
     },
   },
+};
+
+const PERSONALIZED_STYLE_MAP = {
+  CONSIDER_ADDING: 'buy',
+  CONSIDER_BUY_NEW: 'buy',
+  HOLD: 'hold',
+  HOLD_DO_NOT_ADD: 'hold',
+  HOLD_WITH_TIGHT_RISK_CONTROL: 'hold',
+  CONSIDER_REDUCING: 'sell',
+  REDUCE_OR_SELL: 'sell',
+  REDUCE_RISK: 'sell',
+  WAIT: 'hold',
+  AVOID_NEW: 'hold',
 };
 
 function formatPlanDate(iso) {
@@ -119,17 +126,12 @@ function NoteList({ title, items, color = 'primary' }) {
   );
 }
 
-export default function TradingPlanPanel({ plan, currency, embedded = false, position = null }) {
-  const [positionMode, setPositionMode] = useState(position ? 'holding' : 'new');
-
-  useEffect(() => {
-    setPositionMode(position ? 'holding' : 'new');
-  }, [position?.id, position?.symbol]);
+export default function TradingPlanPanel({ plan, currency, embedded = false, position = null, personalizedRisk = null }) {
+  const positionMode = position ? 'holding' : 'new';
 
   if (!plan) return null;
 
   const guidance = POSITION_GUIDANCE[positionMode][plan.action] || POSITION_GUIDANCE[positionMode].hold;
-  const style = ACTION_STYLES[guidance.style] || ACTION_STYLES.hold;
   const planDate = formatPlanDate(plan.plan_date);
   const dcaTitle = positionMode === 'holding' && plan.action === 'buy'
     ? 'แผนแบ่งซื้อเพิ่ม (DCA)'
@@ -138,16 +140,22 @@ export default function TradingPlanPanel({ plan, currency, embedded = false, pos
       : 'แนวทางปฏิบัติ';
   const dcaSplits = getContextualDca(plan, positionMode);
 
+  const displayLabel = personalizedRisk?.action_label ?? guidance.label;
+  const displayStyleKey = personalizedRisk
+    ? (PERSONALIZED_STYLE_MAP[personalizedRisk.action] || 'hold')
+    : guidance.style;
+  const displayStyle = ACTION_STYLES[displayStyleKey] || ACTION_STYLES.hold;
+
   const wrapperClass = embedded
-    ? `rounded-xl p-4 bg-surface/50 border h-full max-h-[85vh] overflow-y-auto ${style.border}`
-    : `glass-card rounded-2xl p-6 animate-fadeIn max-h-[85vh] overflow-y-auto ${style.border}`;
+    ? `rounded-xl p-4 bg-surface/50 border h-full max-h-[85vh] overflow-y-auto ${displayStyle.border}`
+    : `glass-card rounded-2xl p-6 animate-fadeIn max-h-[85vh] overflow-y-auto ${displayStyle.border}`;
 
   return (
     <div className={wrapperClass}>
       <div className="mb-4 pb-3 border-b border-border/40">
         <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
           <Wallet size={16} className="text-primary" />
-          แผนการลงทุนวันนี้
+          {personalizedRisk ? 'แผนการลงทุนที่ปรับตามความเสี่ยงของคุณ' : 'แผนการลงทุนวันนี้'}
         </h3>
         <p className="text-[11px] text-muted mt-1 flex items-center gap-1.5">
           <Calendar size={11} className="text-primary shrink-0" />
@@ -158,38 +166,44 @@ export default function TradingPlanPanel({ plan, currency, embedded = false, pos
         </p>
       </div>
 
-      <SegmentedControl
-        value={positionMode}
-        onChange={setPositionMode}
-        className="mb-4"
-        size="md"
-        fullWidth
-        options={Object.values(POSITION_MODES).map(({ id, label, icon }) => ({
-          value: id,
-          label,
-          icon,
-        }))}
-      />
+      <div className="mb-4">
+        {position ? (
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/10 text-primary">
+            <Package size={13} />
+            ถืออยู่
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-border/50 bg-surface/60 text-muted">
+            <ShoppingCart size={13} />
+            ยังไม่ได้ถือ
+          </span>
+        )}
+      </div>
 
       <div className="flex items-center justify-between mb-3">
         <div>
-          <span className={`text-3xl font-black ${style.text}`}>
-            {guidance.label}
+          <span className={`text-3xl font-black ${displayStyle.text}`}>
+            {displayLabel}
           </span>
           <p className="text-xs text-muted mt-1">
             ความมั่นใจ {(plan.confidence * 100).toFixed(0)}% • Score {plan.score?.toFixed(2)}
+            {personalizedRisk && (
+              <span className="text-primary/80"> • ปรับตามความเสี่ยง {personalizedRisk.max_loss_tolerance_pct}%</span>
+            )}
           </p>
         </div>
-        <div className={`w-14 h-14 rounded-full flex items-center justify-center ${style.bg}`}>
-          {guidance.style === 'buy' ? <TrendingUp size={24} className="text-success" /> :
-           guidance.style === 'sell' ? <TrendingDown size={24} className="text-danger" /> :
+        <div className={`w-14 h-14 rounded-full flex items-center justify-center ${displayStyle.bg}`}>
+          {displayStyleKey === 'buy' ? <TrendingUp size={24} className="text-success" /> :
+           displayStyleKey === 'sell' ? <TrendingDown size={24} className="text-danger" /> :
            <Activity size={24} className="text-warning" />}
         </div>
       </div>
 
       <p className="text-[11px] text-foreground/75 bg-surface/40 px-3 py-2 rounded-lg border border-border/30 mb-4 leading-relaxed">
-        {guidance.hint}
+        {personalizedRisk?.summary ?? guidance.hint}
       </p>
+
+      <PersonalRiskPanel personalized={personalizedRisk} currency={currency} />
 
       <p className="text-xs text-foreground/80 bg-surface/60 p-3 rounded-xl border border-border/30 mb-4 leading-relaxed">
         {plan.summary}

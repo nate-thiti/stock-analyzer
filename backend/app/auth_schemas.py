@@ -111,3 +111,22 @@ class WatchlistOut(BaseModel):
 
 class WatchlistUpdate(BaseModel):
     symbols: List[str] = Field(..., min_length=1, max_length=30)
+
+
+class RiskProfileOut(BaseModel):
+    max_loss_tolerance_pct: Optional[float] = None
+    max_position_pct: float = 10.0
+    risk_per_trade_pct: float = 2.0
+    configured: bool = False
+    portfolio_value: float = 0.0
+    effective_account_size: float = 100_000.0
+    portfolio_from_positions: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class RiskProfileUpdate(BaseModel):
+    max_loss_tolerance_pct: float = Field(..., ge=5, le=80)
+    max_position_pct: Optional[float] = Field(None, ge=5, le=50)
+    risk_per_trade_pct: Optional[float] = Field(None, ge=0.5, le=10)

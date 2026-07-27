@@ -1,6 +1,6 @@
+from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Query, Depends, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List
 import os
 import pandas as pd
 import asyncio
@@ -8,15 +8,15 @@ import asyncio
 from .init_db import init_db
 from .auth import get_current_user
 from .database import get_db
-from .models import User
-from .routers import auth, users, favorites, positions, watchlist, price_alerts
+from .models import User, Position
+from .routers import auth, users, favorites, positions, watchlist, price_alerts, risk_profile
 from sqlalchemy.orm import Session
 from .schemas import (
     StockQuote, StockHistoryResponse, StockInfo, CSVImportRequest, CSVExportRequest,
     AnalysisResponse, ComparisonResponse, BatchAnalysisRequest, SearchResult,
     QuarterlyFundamentalsResponse, QuarterlyFundamentalItem,
     ValuationHistoryResponse, ValuationHistoryItem,
-    MarketSignalsResponse,
+    MarketSignalsResponse, PersonalizedRiskOut,
 )
 from .market_signals import get_market_signals
 from .services import (
@@ -28,6 +28,8 @@ from .analysis import (
     calculate_technical_analysis, calculate_trend_analysis,
 )
 from .risk import generate_recommendation, generate_trading_plan
+from .personalized_risk import build_personalized_risk
+from .portfolio_utils import resolve_account_size
 
 app = FastAPI(
     title="Stock Analyzer API",
@@ -49,6 +51,7 @@ app.include_router(favorites.router)
 app.include_router(positions.router)
 app.include_router(watchlist.router)
 app.include_router(price_alerts.router)
+app.include_router(risk_profile.router)
 
 protected = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -66,12 +69,23 @@ def _history_to_df(history) -> pd.DataFrame:
     return df
 
 
+def _compute_position_pct(user: User, db: Session, market_value: Optional[float]) -> Optional[float]:
+    if not market_value or market_value <= 0:
+        return None
+    base = resolve_account_size(db, user.id, 100_000.0)
+    if base <= 0:
+        return None
+    return round(market_value / base * 100, 1)
+
+
 def _run_analysis(
     symbol: str,
     period: str = "6mo",
     interval: str = "1d",
     account_size: float = 100_000,
     risk_pct: float = 2.0,
+    user: Optional[User] = None,
+    db: Optional[Session] = None,
 ) -> AnalysisResponse:
     history = get_stock_history(symbol, period, interval)
     if not history:
@@ -98,6 +112,37 @@ def _run_analysis(
         current_price, account_size, risk_pct, currency,
     )
 
+    personalized = None
+    if user and user.max_loss_tolerance_pct is not None and db is not None:
+        cleaned = symbol.upper()
+        pos = db.query(Position).filter(
+            Position.user_id == user.id,
+            Position.symbol == cleaned,
+        ).first()
+        pnl_pct = None
+        avg_cost = None
+        position_pct = None
+        if pos:
+            avg_cost = pos.avg_cost
+            if pos.avg_cost > 0:
+                pnl_pct = round((current_price - pos.avg_cost) / pos.avg_cost * 100, 2)
+            mv = pos.shares * current_price
+            position_pct = _compute_position_pct(user, db, mv)
+
+        pr = build_personalized_risk(
+            analysis_score=recommendation.get("score", 0),
+            analysis_action=recommendation["action"],
+            current_price=current_price,
+            stop_loss=trading_plan.stop_loss,
+            max_loss_tolerance_pct=user.max_loss_tolerance_pct,
+            max_position_pct=user.max_position_pct or 10.0,
+            avg_cost=avg_cost,
+            pnl_pct=pnl_pct,
+            position_pct=position_pct,
+            currency=currency,
+        )
+        personalized = PersonalizedRiskOut(**pr.to_dict())
+
     return AnalysisResponse(
         symbol=symbol.upper(),
         current_price=current_price,
@@ -108,6 +153,7 @@ def _run_analysis(
         recommendation=recommendation["action"],
         confidence=recommendation["confidence"],
         trading_plan=trading_plan,
+        personalized_risk=personalized,
     )
 
 
@@ -200,11 +246,15 @@ def get_full_analysis(
     symbol: str = Query(...),
     period: str = Query("6mo"),
     interval: str = Query("1d"),
-    account_size: float = Query(100_000, description="เงินทุนพอร์ต"),
-    risk_pct: float = Query(2.0, description="ความเสี่ยงต่อเทรด (%)"),
+    account_size: float = Query(None, description="เงินทุนพอร์ต"),
+    risk_pct: float = Query(None, description="ความเสี่ยงต่อเทรด (%)"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
+    acct = account_size if account_size is not None else resolve_account_size(db, user.id, 100_000.0)
+    risk = risk_pct if risk_pct is not None else (user.risk_per_trade_pct or 2.0)
     try:
-        return _run_analysis(symbol, period, interval, account_size, risk_pct)
+        return _run_analysis(symbol, period, interval, acct, risk, user=user, db=db)
     except HTTPException:
         raise
     except Exception as e:
@@ -216,9 +266,13 @@ def compare_stocks(
     symbols: str = Query(..., description="สัญลักษณ์คั่นด้วยจุลภาค เช่น AAPL,MSFT,GOOGL"),
     period: str = Query("6mo"),
     interval: str = Query("1d"),
-    account_size: float = Query(100_000),
-    risk_pct: float = Query(2.0),
+    account_size: float = Query(None),
+    risk_pct: float = Query(None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
+    acct = account_size if account_size is not None else resolve_account_size(db, user.id, 100_000.0)
+    risk = risk_pct if risk_pct is not None else (user.risk_per_trade_pct or 2.0)
     symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     if len(symbol_list) < 2:
         raise HTTPException(status_code=400, detail="ต้องระบุอย่างน้อย 2 หุ้น")
@@ -228,7 +282,7 @@ def compare_stocks(
     results = []
     for sym in symbol_list:
         try:
-            results.append(_run_analysis(sym, period, interval, account_size, risk_pct))
+            results.append(_run_analysis(sym, period, interval, acct, risk, user=user, db=db))
         except HTTPException:
             results.append(AnalysisResponse(symbol=sym, recommendation="error", confidence=0))
 
@@ -255,11 +309,17 @@ def compare_stocks(
 
 
 @protected.post("/api/analysis/batch")
-async def batch_analysis(body: BatchAnalysisRequest):
+async def batch_analysis(
+    body: BatchAnalysisRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    acct = body.account_size if body.account_size else resolve_account_size(db, user.id, 100_000.0)
+    risk = body.risk_pct if body.risk_pct else (user.risk_per_trade_pct or 2.0)
     results = []
     for symbol in body.symbols:
         try:
-            results.append(_run_analysis(symbol, body.period, body.interval, body.account_size, body.risk_pct))
+            results.append(_run_analysis(symbol, body.period, body.interval, acct, risk, user=user, db=db))
         except HTTPException as e:
             results.append({"symbol": symbol, "error": e.detail})
         except Exception as e:

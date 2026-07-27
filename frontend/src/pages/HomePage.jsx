@@ -1,19 +1,34 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Globe, ArrowUpRight, ArrowDownRight, TrendingUp } from 'lucide-react';
 import { api, POPULAR_STOCKS } from '../api';
 import { useQuotePoll, HOME_POLL_MS } from '../hooks/useQuotePoll';
+import { useRiskProfile } from '../context/RiskProfileContext';
 import StarButton from '../components/StarButton';
 import MarketStateBadge from '../components/MarketStateBadge';
 import MarketSignalSections from '../components/MarketSignalSections';
 import QuickCompareSection from '../components/QuickCompareSection';
 import RecentStocksSection from '../components/RecentStocksSection';
+import RiskProfileModal from '../components/RiskProfileModal';
 
 export default function HomePage() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [riskModalOpen, setRiskModalOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { profile, needsSetup, save, load, loading: profileLoading } = useRiskProfile();
+
+  useEffect(() => {
+    if (profile?.configured) {
+      setRiskModalOpen(false);
+      return;
+    }
+    if (!profileLoading && (needsSetup || location.state?.setupRisk)) {
+      setRiskModalOpen(true);
+    }
+  }, [needsSetup, profileLoading, location.state?.setupRisk, profile?.configured]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -103,6 +118,27 @@ export default function HomePage() {
       </section>
 
       <QuickCompareSection />
+
+      <RiskProfileModal
+        open={riskModalOpen}
+        required={needsSetup}
+        initialProfile={profile}
+        title={needsSetup ? 'ตั้งค่าความเสี่ยงก่อนเริ่มใช้งาน' : 'ตั้งค่าโปรไฟล์ความเสี่ยง'}
+        onClose={() => {
+          setRiskModalOpen(false);
+          if (location.state?.setupRisk) {
+            navigate('.', { replace: true, state: {} });
+          }
+        }}
+        onSave={async (data) => {
+          await save(data);
+          await load();
+          setRiskModalOpen(false);
+          if (location.state?.setupRisk) {
+            navigate('.', { replace: true, state: {} });
+          }
+        }}
+      />
     </div>
   );
 }

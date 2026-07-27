@@ -8,8 +8,10 @@ import SegmentedControl from './SegmentedControl';
 
 const SECTIONS = [
   { key: 'buy', title: 'ควรซื้อเป็นอย่างยิ่ง', icon: TrendingUp, color: 'text-success', border: 'border-success/25', bg: 'bg-success/5' },
-  { key: 'hold', title: 'ถือต่อ', icon: Activity, color: 'text-warning', border: 'border-warning/25', bg: 'bg-warning/5' },
-  { key: 'sell', title: 'ขาย', icon: TrendingDown, color: 'text-danger', border: 'border-danger/25', bg: 'bg-danger/5' },
+  { key: 'lean_buy', title: 'น่าจับตา (Lean Buy)', icon: TrendingUp, color: 'text-success/80', border: 'border-success/20', bg: 'bg-success/[0.03]' },
+  { key: 'hold', title: 'ถือต่อ / รอดู', icon: Activity, color: 'text-warning', border: 'border-warning/25', bg: 'bg-warning/5' },
+  { key: 'lean_sell', title: 'ระวัง (Lean Sell)', icon: TrendingDown, color: 'text-danger/80', border: 'border-danger/20', bg: 'bg-danger/[0.03]' },
+  { key: 'sell', title: 'ขาย / ลดสัดส่วน', icon: TrendingDown, color: 'text-danger', border: 'border-danger/25', bg: 'bg-danger/5' },
 ];
 
 function marketFromSymbol(symbol) {
@@ -151,7 +153,7 @@ function SignalCard({ item }) {
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className="text-[10px] font-mono text-muted bg-surface px-1.5 py-0.5 rounded border border-border shrink-0">{market}</span>
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>
-          {actionLabel} {(item.confidence * 100).toFixed(0)}%
+          {item.signal_tier_label || actionLabel} {(item.confidence * 100).toFixed(0)}%
         </span>
       </div>
       <div className="flex-1 min-w-0">
