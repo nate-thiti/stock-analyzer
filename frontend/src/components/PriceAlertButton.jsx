@@ -3,7 +3,6 @@ import { Bell, BellRing, Loader2 } from 'lucide-react';
 import { api, inferCurrency, formatMoney } from '../api';
 import Modal from './Modal';
 import SelectField from './SelectField';
-import AlertQuickSet from './AlertQuickSet';
 import { computeDistanceToTrigger, distanceColorClass } from '../utils/priceAlert';
 
 export default function PriceAlertButton({ symbol, currentPrice, currency, alerts = [], onChange, compact = false }) {
@@ -110,12 +109,6 @@ export default function PriceAlertButton({ symbol, currentPrice, currency, alert
               required
               autoFocus
               className="w-full mt-1 bg-surface border border-border rounded-xl px-3 py-2 text-sm font-mono"
-            />
-            <AlertQuickSet
-              currentPrice={currentPrice}
-              currency={cur}
-              direction={direction}
-              onSelect={setTarget}
             />
           </div>
           {error && <p className="text-xs text-danger">{error}</p>}

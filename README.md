@@ -33,7 +33,7 @@
 - สลับโหมด **"ถืออยู่แล้ว" / "ยังไม่ได้ซื้อ"** สำหรับคำแนะนำที่ต่างกัน
 - ราคา / กราฟ / วิเคราะห์ refresh ทุก **1 นาที**
 - แสดง **เวลาซื้อขายล่าสุด** (จาก Yahoo) และ **เวลาที่ดึงข้อมูล** (`fetched_at`) แยกกัน
-- ปุ่ม ⭐ เพิ่มรายการโปรด, **Price Alert** ตั้งแจ้งเตือนเมื่อราคาถึงเป้า (modal มี **Quick set ±5/10%** จากราคาปัจจุบัน)
+- ปุ่ม ⭐ เพิ่มรายการโปรด, **Price Alert** ตั้งแจ้งเตือนเมื่อราคาถึงเป้า
 - Banner แสดงถ้าถือหุ้นในพอร์ต
 
 ### พอร์ต (`/portfolio`)
@@ -57,7 +57,7 @@
 
 ### แจ้งเตือนราคา (`/alerts`)
 - หน้าจัดการ alert ทั้งหมด — สรุป ทั้งหมด / กำลังเฝ้า / ถึงเป้าแล้ว (header แถวเดียวบน desktop)
-- ฟอร์มตั้ง alert ใหม่ (สัญลักษณ์ | เงื่อนไข | ราคาเป้า | ปุ่ม) — **ไม่มี Quick set** (ใช้ modal ในหน้าหุ้นแทน)
+- ฟอร์มตั้ง alert ใหม่ (สัญลักษณ์ | เงื่อนไข | ราคาเป้า | ปุ่ม)
 - ตาราง: ราคาปัจจุบัน **สีเขียว/แดง** ตาม % เปลี่ยนแปลงวัน + แสดง **อีก X% ถึงเป้า**
 - filter ตาราง, ลบได้, แบนเนอร์เมื่อ trigger
 - ตรวจราคา auto ทุก **1 นาที** — badge กระดิ่งใน header เมื่อ trigger
@@ -193,7 +193,7 @@ stock-analyzer/
         │   ├── recentStocks.js
         │   ├── chartIndicators.js
         │   ├── chartPriceRange.js   # min/max จาก history ตาม period/interval
-        │   ├── priceAlert.js        # ระยะห่างถึงเป้า + quick set offset
+        │   ├── priceAlert.js        # ระยะห่างถึงเป้า
         │   ├── alertSound.js
         │   └── glossary.js
         ├── context/
@@ -217,7 +217,6 @@ stock-analyzer/
             ├── MarketSignalSections.jsx
             ├── PortfolioDashboard.jsx
             ├── PriceAlertButton.jsx
-            ├── AlertQuickSet.jsx       # ปุ่ม ±% ใน modal alert (หน้าหุ้น/โปรด)
             ├── PriceRangeGrid.jsx      # ช่วงราคาต่ำ/สูงตามกราฟ
             ├── MarketStateBadge.jsx    # badge สถานะตลาด (เปิด/ปิด/ก่อนตลาดเปิด)
             ├── DayQuoteStats.jsx       # เปิดวัน / สูง / ต่ำ ตอนตลาดเปิด
