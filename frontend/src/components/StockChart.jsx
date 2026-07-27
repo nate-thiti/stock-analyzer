@@ -82,7 +82,23 @@ const TREND_STYLES = {
   sideways: 'text-warning bg-warning/10 border-warning/25',
 };
 
-export default function StockChart({ history, interval = '1d' }) {
+function formatChartAxisTime(time, exchangeTimezone) {
+  if (typeof time === 'number') {
+    return new Date(time * 1000).toLocaleString('th-TH', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: exchangeTimezone || undefined,
+    });
+  }
+  if (time && typeof time === 'object' && 'year' in time) {
+    return `${time.day} ${time.month} ${time.year}`;
+  }
+  return String(time);
+}
+
+export default function StockChart({ history, interval = '1d', exchangeTimezone }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const { theme } = useTheme();
@@ -123,6 +139,13 @@ export default function StockChart({ history, interval = '1d' }) {
           timeVisible: !DAILY_INTERVALS.has(interval),
           secondsVisible: false,
         },
+        ...(exchangeTimezone && !DAILY_INTERVALS.has(interval)
+          ? {
+              localization: {
+                timeFormatter: (time) => formatChartAxisTime(time, exchangeTimezone),
+              },
+            }
+          : {}),
         width: containerRef.current.clientWidth,
         height: chartHeight,
       });
@@ -276,7 +299,7 @@ export default function StockChart({ history, interval = '1d' }) {
       chartRef.current?.remove();
       chartRef.current = null;
     };
-  }, [history, theme, interval, indicators, isMobile, chartHeight]);
+  }, [history, theme, interval, indicators, isMobile, chartHeight, exchangeTimezone]);
 
   if (error) {
     return (

@@ -1,4 +1,13 @@
+import {
+  calendarDateInTimezone,
+  formatCalendarDateYmd,
+  formatHistoryDate,
+  isDailyChartInterval,
+} from './utils/dateFormat.js';
+
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
+export { formatCalendarDateYmd, calendarDateInTimezone, formatHistoryDate, isDailyChartInterval };
 
 export const DEFAULT_ACCOUNT_SIZE = 100_000;
 export const DEFAULT_RISK_PCT = 2;
@@ -242,18 +251,27 @@ export function isMarketRegular(marketState) {
 }
 
 export function formatMarketTime(iso, timezone, marketState) {
-  if (!iso) return { time: '-', state: null };
+  if (!iso) return { time: '-', state: null, dateLabel: null, timeOnly: null };
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return { time: iso, state: marketState };
+  if (Number.isNaN(date.getTime())) {
+    return { time: iso, state: marketState, dateLabel: null, timeOnly: null };
+  }
 
+  const cal = calendarDateInTimezone(iso, timezone);
   const time = date.toLocaleString('th-TH', {
     dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: timezone || undefined,
+  });
+  const timeOnly = date.toLocaleString('th-TH', {
     timeStyle: 'short',
     timeZone: timezone || undefined,
   });
 
   return {
     time,
+    timeOnly,
+    dateLabel: cal ? formatCalendarDateYmd(cal) : null,
     state: MARKET_STATE_LABELS[marketState] || marketState || null,
   };
 }
@@ -265,25 +283,6 @@ export function formatFetchedAt(iso, timezone) {
   return date.toLocaleString('th-TH', {
     dateStyle: 'short',
     timeStyle: 'medium',
-    timeZone: timezone || undefined,
-  });
-}
-
-export function formatHistoryDate(rawTime, timezone) {
-  if (!rawTime) return '-';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(rawTime)) {
-    const [y, m, d] = rawTime.split('-').map(Number);
-    const date = new Date(Date.UTC(y, m - 1, d));
-    return date.toLocaleDateString('th-TH', {
-      dateStyle: 'medium',
-      timeZone: timezone || 'UTC',
-    });
-  }
-  const date = new Date(rawTime);
-  if (Number.isNaN(date.getTime())) return rawTime;
-  return date.toLocaleString('th-TH', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
     timeZone: timezone || undefined,
   });
 }

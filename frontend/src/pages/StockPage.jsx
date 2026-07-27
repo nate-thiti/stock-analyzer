@@ -4,7 +4,7 @@ import {
   ArrowUpRight, ArrowDownRight, AlertTriangle, Building2,
   GitCompare, Info, BarChart3, Percent, Coins, Layers, Loader2, Clock, Radio, Briefcase,
 } from 'lucide-react';
-import { api, formatHistoryDate, formatMarketCap, formatMarketTime, formatFetchedAt, formatPct, formatMoney, formatPnl, EXTENDED_HOURS_LABEL, POST_MARKET_LABEL, isMarketRegular } from '../api';
+import { api, formatHistoryDate, formatMarketCap, formatMarketTime, formatFetchedAt, formatPct, formatMoney, formatPnl, EXTENDED_HOURS_LABEL, POST_MARKET_LABEL, isMarketRegular, isDailyChartInterval } from '../api';
 import { useQuotePoll, ANALYSIS_POLL_MS } from '../hooks/useQuotePoll';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import { addRecentStock } from '../utils/recentStocks';
@@ -306,7 +306,16 @@ export default function StockPage() {
                       <p className="flex items-center gap-1.5 flex-wrap">
                         <Clock size={12} className="text-primary shrink-0" />
                         <span>
-                          เวลาซื้อขายล่าสุด {marketUpdate.time}
+                          {isDailyChartInterval(candleInterval) && marketUpdate.dateLabel ? (
+                            <>
+                              วันซื้อขายล่าสุด {marketUpdate.dateLabel}
+                              {marketUpdate.timeOnly && (
+                                <> · ปิด {marketUpdate.timeOnly}</>
+                              )}
+                            </>
+                          ) : (
+                            <>เวลาซื้อขายล่าสุด {marketUpdate.time}</>
+                          )}
                           {quote.exchange_timezone && (
                             <span className="text-muted/70"> ({quote.exchange_timezone.replace('_', ' ')})</span>
                           )}
@@ -366,11 +375,15 @@ export default function StockPage() {
               </div>
             ) : history.length > 0 ? (
               <>
-                <StockChart history={history} interval={candleInterval} />
+                <StockChart
+                  history={history}
+                  interval={candleInterval}
+                  exchangeTimezone={quote?.exchange_timezone}
+                />
                 {chartLastBar && (
                   <p className="mt-2 text-[10px] text-muted text-right">
                     แท่งล่าสุด: {chartLastBar}
-                    {quote?.exchange_timezone && (
+                    {isDailyChartInterval(candleInterval) && (
                       <span className="text-muted/70"> (วันซื้อขาย)</span>
                     )}
                   </p>

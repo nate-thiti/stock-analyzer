@@ -452,13 +452,36 @@ def get_fundamental_metrics(symbol: str, price: float, history_df=None) -> dict:
     return compute_fundamentals(price, raw, history_df)
 
 
-def _format_history_time(idx, interval: str) -> str:
-    """Daily bars use YYYY-MM-DD (exchange date). Intraday uses ISO with timezone."""
+def _format_history_time(idx, interval: str, tz_name: Optional[str] = None) -> str:
+    """Daily bars use YYYY-MM-DD (exchange calendar date). Intraday uses ISO with timezone."""
     if interval in ("1d", "1wk", "1mo"):
+        if hasattr(idx, "to_pydatetime"):
+            dt = idx.to_pydatetime()
+            if tz_name:
+                try:
+                    tz = ZoneInfo(tz_name)
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=tz)
+                    else:
+                        dt = dt.astimezone(tz)
+                except Exception:
+                    pass
+            elif hasattr(idx, "strftime"):
+                return idx.strftime("%Y-%m-%d")
+            return dt.strftime("%Y-%m-%d")
         if hasattr(idx, "strftime"):
             return idx.strftime("%Y-%m-%d")
         return str(idx)[:10]
 
+    if hasattr(idx, "to_pydatetime"):
+        dt = idx.to_pydatetime()
+        if tz_name and dt.tzinfo is not None:
+            try:
+                dt = dt.astimezone(ZoneInfo(tz_name))
+            except Exception:
+                pass
+        if hasattr(dt, "isoformat"):
+            return dt.isoformat()
     if hasattr(idx, "isoformat"):
         return idx.isoformat()
     if hasattr(idx, "strftime"):
@@ -478,6 +501,8 @@ def get_stock_history(symbol: str, period: str = "1mo", interval: str = "1d") ->
 
     try:
         ticker = _get_ticker(cleaned)
+        info = _ticker_info(ticker)
+        tz_name = info.get("exchangeTimezoneName")
         df = ticker.history(period=yf_period, interval=yf_interval)
         if df.empty:
             return []
@@ -485,7 +510,7 @@ def get_stock_history(symbol: str, period: str = "1mo", interval: str = "1d") ->
         history = []
         for idx, row in df.iterrows():
             history.append(StockHistoryItem(
-                time=_format_history_time(idx, yf_interval),
+                time=_format_history_time(idx, yf_interval, tz_name),
                 open=round(float(row["Open"]), 2),
                 high=round(float(row["High"]), 2),
                 low=round(float(row["Low"]), 2),
