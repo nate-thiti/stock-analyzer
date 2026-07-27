@@ -159,19 +159,24 @@ export default function StockPage() {
       .catch(() => setPosition(null));
   }, [symbol]);
 
+  // โหลดข้อมูลบริษัทแยกจากวิเคราะห์ — ไม่ให้หายเมื่อ analysis ช้าหรือล้มเหลว
+  useEffect(() => {
+    if (!symbol) return;
+    let cancelled = false;
+    api.info(symbol)
+      .then((i) => { if (!cancelled) setInfo(i); })
+      .catch(() => { /* keep previous info */ });
+    return () => { cancelled = true; };
+  }, [symbol]);
+
   // โหลดวิเคราะห์แยก
   useEffect(() => {
     if (!symbol) return;
     setAnalysisLoading(true);
     setAnalysis(null);
-    setInfo(null);
 
     api.analysis(symbol, period, candleInterval)
-      .then((a) => {
-        setAnalysis(a);
-        return api.info(symbol).catch(() => null);
-      })
-      .then((i) => { if (i) setInfo(i); })
+      .then((a) => setAnalysis(a))
       .catch((err) => setError(err.message))
       .finally(() => setAnalysisLoading(false));
   }, [symbol, period, candleInterval, position?.id, position?.shares, position?.avg_cost]);

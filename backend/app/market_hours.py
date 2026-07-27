@@ -81,6 +81,10 @@ def merge_yahoo_info(ticker) -> dict:
                 val = getattr(fast, src, None)
                 if val is not None:
                     info[dst] = val
+        if not info.get("exchangeTimezoneName"):
+            tz = getattr(fast, "timezone", None)
+            if tz:
+                info["exchangeTimezoneName"] = str(tz)
     except Exception:
         pass
 

@@ -44,4 +44,10 @@ describe('buildMarketTimeDisplay', () => {
     assert.match(result.dateLabel, /25/);
     assert.ok(result.timeOnly);
   });
+
+  it('hides midnight placeholder close times', () => {
+    const result = buildMarketTimeDisplay('2026-07-24T00:00:00-04:00', 'America/New_York');
+    assert.ok(result.dateLabel);
+    assert.equal(result.timeOnly, null);
+  });
 });

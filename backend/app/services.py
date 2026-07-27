@@ -16,6 +16,7 @@ RAW_CACHE_EXPIRY = 60
 quote_cache: Dict[str, Dict[str, Any]] = {}
 raw_cache: Dict[str, Dict[str, Any]] = {}
 history_cache: Dict[str, Dict[str, Any]] = {}
+extended_cache: Dict[str, Dict[str, Any]] = {}
 _ticker_cache: Dict[str, Any] = {}
 _inflight_raw: Dict[str, threading.Event] = {}
 _inflight_lock = threading.Lock()
@@ -54,6 +55,67 @@ def _get_ticker(symbol: str):
 
 def _ticker_info(ticker) -> dict:
     return merge_yahoo_info(ticker)
+
+
+def _ticker_info_for_symbol(symbol: str) -> dict:
+    """Load Yahoo info; retry once with a fresh ticker if the payload is too sparse."""
+    cleaned = clean_symbol(symbol)
+    info = merge_yahoo_info(_get_ticker(cleaned))
+    has_time = bool(info.get("regularMarketTime") or info.get("postMarketTime") or info.get("preMarketTime"))
+    has_extended = bool(info.get("preMarketPrice") or info.get("postMarketPrice"))
+    if not has_time and not has_extended:
+        _ticker_cache.pop(cleaned, None)
+        info = merge_yahoo_info(_get_ticker(cleaned))
+    return info
+
+
+def _exchange_close_time(symbol: str) -> tuple[int, int]:
+    if (symbol or "").upper().endswith(".BK"):
+        return 16, 30
+    return 16, 0
+
+
+def _is_midnight_bar(dt: datetime) -> bool:
+    return dt.hour == 0 and dt.minute == 0 and dt.second == 0
+
+
+def _apply_session_close(dt: datetime, symbol: str) -> datetime:
+    hour, minute = _exchange_close_time(symbol)
+    return dt.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+
+def _timestamp_to_local_iso(ts: int, tz_name: Optional[str]) -> str:
+    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+    if tz_name:
+        try:
+            dt = dt.astimezone(ZoneInfo(tz_name))
+        except Exception:
+            pass
+    return dt.isoformat()
+
+
+def _pick_hist_bar_for_market_time(
+    hist: pd.DataFrame,
+    symbol: str,
+    tz_name: Optional[str],
+    market_state: Optional[str],
+):
+    if hist is None or hist.empty:
+        return None
+    tz = ZoneInfo(tz_name) if tz_name else timezone.utc
+    now_local = datetime.now(timezone.utc).astimezone(tz)
+    today = now_local.date()
+    skip_today_placeholder = market_state in (None, "PRE", "PREPRE", "CLOSED")
+
+    for idx in reversed(hist.index.tolist()):
+        if not hasattr(idx, "to_pydatetime"):
+            return idx
+        dt = idx.to_pydatetime()
+        local = dt.astimezone(tz) if dt.tzinfo else dt.replace(tzinfo=tz)
+        if skip_today_placeholder and local.date() >= today and _is_midnight_bar(local):
+            continue
+        return idx
+    return hist.index[-1]
 
 
 def _row_val(df: pd.DataFrame, col, *names) -> Optional[float]:
@@ -231,22 +293,20 @@ def get_raw_financials(symbol: str) -> RawFinancials:
             evt.set()
 
 
-def _quote_market_time(info: dict, hist: pd.DataFrame) -> tuple[str, Optional[str], Optional[str]]:
+def _quote_market_time(
+    info: dict,
+    hist: pd.DataFrame,
+    symbol: str,
+) -> tuple[str, Optional[str], Optional[str]]:
     tz_name = info.get("exchangeTimezoneName")
     market_state = info.get("marketState")
 
-    ts = info.get("regularMarketTime")
+    ts = info.get("regularMarketTime") or info.get("postMarketTime")
     if ts:
-        dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-        if tz_name:
-            try:
-                dt = dt.astimezone(ZoneInfo(tz_name))
-            except Exception:
-                pass
-        return dt.isoformat(), market_state, tz_name
+        return _timestamp_to_local_iso(int(ts), tz_name), market_state, tz_name
 
     if hist is not None and not hist.empty:
-        last = hist.index[-1]
+        last = _pick_hist_bar_for_market_time(hist, symbol, tz_name, market_state)
         if hasattr(last, "to_pydatetime"):
             dt = last.to_pydatetime()
             if dt.tzinfo is None and tz_name:
@@ -254,6 +314,8 @@ def _quote_market_time(info: dict, hist: pd.DataFrame) -> tuple[str, Optional[st
                     dt = dt.replace(tzinfo=ZoneInfo(tz_name))
                 except Exception:
                     pass
+            if _is_midnight_bar(dt):
+                dt = _apply_session_close(dt, symbol)
             return dt.isoformat(), market_state, tz_name
         return str(last), market_state, tz_name
 
@@ -288,19 +350,64 @@ def _optional_quote_float(value) -> Optional[float]:
         return None
 
 
+def _optional_change_float(value) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        num = float(value)
+        if num != num:
+            return None
+        return round(num, 2)
+    except (TypeError, ValueError):
+        return None
+
+
+def _last_extended_price_from_intraday(ticker, symbol: str, session: str) -> Optional[float]:
+    """Fallback when Yahoo omits pre/post fields — uses 1m prepost history (cached 60s)."""
+    cleaned = clean_symbol(symbol)
+    now = time.time()
+    cache_key = f"{cleaned}:{session}"
+    if cache_key in extended_cache and now - extended_cache[cache_key]["timestamp"] < QUOTE_CACHE_EXPIRY:
+        return extended_cache[cache_key]["data"]
+
+    price = None
+    try:
+        hist = ticker.history(period="2d", interval="1m", prepost=True)
+        if hist is not None and not hist.empty:
+            close_hour, _ = _exchange_close_time(cleaned)
+            for idx in reversed(hist.index.tolist()):
+                if not hasattr(idx, "to_pydatetime"):
+                    continue
+                dt = idx.to_pydatetime()
+                hour = dt.hour + dt.minute / 60
+                if session == "post" and hour >= close_hour + 0.01:
+                    price = _optional_quote_float(hist.loc[idx, "Close"])
+                    break
+                if session == "pre" and hour < 9.5:
+                    price = _optional_quote_float(hist.loc[idx, "Close"])
+                    break
+    except Exception:
+        pass
+
+    extended_cache[cache_key] = {"timestamp": now, "data": price}
+    return price
+
+
 def _extended_session(
     info: dict,
     market_state: Optional[str],
     reference_close: Optional[float],
+    ticker=None,
+    symbol: Optional[str] = None,
 ) -> dict:
     """Extract pre/post-market from Yahoo — fallback to currentPrice in PRE/POST."""
     pre_price = _optional_quote_float(info.get("preMarketPrice"))
-    pre_change = _optional_quote_float(info.get("preMarketChange"))
-    pre_change_pct = _optional_quote_float(info.get("preMarketChangePercent"))
+    pre_change = _optional_change_float(info.get("preMarketChange"))
+    pre_change_pct = _optional_change_float(info.get("preMarketChangePercent"))
 
     post_price = _optional_quote_float(info.get("postMarketPrice"))
-    post_change = _optional_quote_float(info.get("postMarketChange"))
-    post_change_pct = _optional_quote_float(info.get("postMarketChangePercent"))
+    post_change = _optional_change_float(info.get("postMarketChange"))
+    post_change_pct = _optional_change_float(info.get("postMarketChangePercent"))
 
     current = _optional_quote_float(info.get("currentPrice"))
 
@@ -308,6 +415,11 @@ def _extended_session(
         pre_price = current
     if market_state == "POST" and post_price is None and current is not None:
         post_price = current
+
+    if ticker is not None and symbol and post_price is None and market_state in ("POST", "POSTPOST", "PREPRE"):
+        post_price = _last_extended_price_from_intraday(ticker, symbol, session="post")
+    if ticker is not None and symbol and pre_price is None and market_state == "PRE":
+        pre_price = _last_extended_price_from_intraday(ticker, symbol, session="pre")
 
     ref = reference_close or _optional_quote_float(
         info.get("regularMarketPreviousClose") or info.get("previousClose")
@@ -343,13 +455,13 @@ def get_stock_quote(symbol: str) -> Optional[StockQuote]:
 
     try:
         ticker = _get_ticker(cleaned)
-        info = _ticker_info(ticker)
+        info = _ticker_info_for_symbol(cleaned)
         hist = ticker.history(period="5d")
 
         if hist.empty:
             return None
 
-        market_time, market_state, exchange_timezone = _quote_market_time(info, hist)
+        market_time, market_state, exchange_timezone = _quote_market_time(info, hist, cleaned)
         if not market_state:
             market_state = infer_market_state(cleaned, exchange_timezone)
         fetched_at = datetime.now(timezone.utc).isoformat()
@@ -373,7 +485,7 @@ def get_stock_quote(symbol: str) -> Optional[StockQuote]:
             change = round(price - prev, 2)
             change_pct = round(change / prev * 100, 2) if prev else 0
 
-        extended = _extended_session(info, market_state, prev_close or price)
+        extended = _extended_session(info, market_state, prev_close or price, ticker=ticker, symbol=cleaned)
 
         day_open, day_high, day_low = _day_stats_from_quote(info, hist, market_state)
         
@@ -412,8 +524,7 @@ def get_stock_info(symbol: str, price: Optional[float] = None, history_df=None) 
         return None
 
     metrics = compute_fundamentals(price, raw, history_df)
-    ticker = _get_ticker(cleaned)
-    info = _ticker_info(ticker)
+    info = _ticker_info_for_symbol(cleaned)
 
     dividends = raw.dividends or []
     annual_dividend = round(sum(d["amount"] for d in dividends[:4]), 4) if dividends else None
@@ -445,6 +556,25 @@ def get_stock_info(symbol: str, price: Optional[float] = None, history_df=None) 
         currency=raw.currency,
         exchange=raw.exchange,
     )
+
+
+def resolve_symbol_profile(symbol: str) -> tuple[Optional[str], Optional[str]]:
+    """Return (name, sector) with ticker.info fallback when raw financials are sparse."""
+    cleaned = clean_symbol(symbol)
+    raw = get_raw_financials(cleaned)
+    name = raw.name
+    sector = raw.sector
+    if name and sector:
+        return name, sector
+    try:
+        info = _ticker_info(_get_ticker(cleaned))
+        if not name:
+            name = pick_info_str(info, "shortName", "longName")
+        if not sector:
+            sector = pick_info_str(info, "sector", "sectorDisp")
+    except Exception:
+        pass
+    return name, sector
 
 
 def get_fundamental_metrics(symbol: str, price: float, history_df=None) -> dict:

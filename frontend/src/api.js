@@ -3,6 +3,7 @@ import {
   formatCalendarDateYmd,
   formatHistoryDate,
   isDailyChartInterval,
+  isMidnightMarketTime,
 } from './utils/dateFormat.js';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
@@ -267,10 +268,11 @@ export function formatMarketTime(iso, timezone, marketState) {
     timeStyle: 'short',
     timeZone: timezone || undefined,
   });
-  const timeOnly = date.toLocaleString('th-TH', {
+  const timeOnlyRaw = date.toLocaleString('th-TH', {
     timeStyle: 'short',
     timeZone: timezone || undefined,
   });
+  const timeOnly = isMidnightMarketTime(iso, timezone) ? null : timeOnlyRaw;
 
   return {
     time,

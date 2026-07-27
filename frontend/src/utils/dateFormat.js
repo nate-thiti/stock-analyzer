@@ -48,11 +48,24 @@ export function buildMarketTimeDisplay(iso, timezone) {
     return { dateLabel: null, timeOnly: null };
   }
   const cal = calendarDateInTimezone(iso, timezone);
+  const timeOnly = date.toLocaleString('th-TH', {
+    timeStyle: 'short',
+    timeZone: timezone || undefined,
+  });
+  const hideTime = timeOnly.startsWith('00:00');
   return {
     dateLabel: cal ? formatCalendarDateYmd(cal) : null,
-    timeOnly: date.toLocaleString('th-TH', {
-      timeStyle: 'short',
-      timeZone: timezone || undefined,
-    }),
+    timeOnly: hideTime ? null : timeOnly,
   };
+}
+
+export function isMidnightMarketTime(iso, timezone) {
+  if (!iso) return false;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return false;
+  const timeOnly = date.toLocaleString('th-TH', {
+    timeStyle: 'short',
+    timeZone: timezone || undefined,
+  });
+  return timeOnly.startsWith('00:00');
 }
