@@ -24,3 +24,17 @@ services:
         sync: false
       - key: BMC_URL
         sync: false
+      - key: QUOTE_CACHE_SECONDS
+        value: "300"
+      - key: HISTORY_CACHE_SECONDS
+        value: "600"
+      - key: RAW_CACHE_SECONDS
+        value: "21600"
+      - key: RAW_STALE_CACHE_SECONDS
+        value: "86400"
+      - key: STALE_CACHE_SECONDS
+        value: "3600"
+      - key: YAHOO_TIMEOUT_SECONDS
+        value: "12"
+      - key: YAHOO_MAX_WORKERS
+        value: "4"

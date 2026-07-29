@@ -49,6 +49,23 @@ def test_quote_timeout_is_http_503():
     assert response.headers["retry-after"] == "30"
 
 
+def test_company_info_falls_back_to_quote_when_financials_are_limited(monkeypatch):
+    monkeypatch.setattr(
+        services,
+        "get_raw_financials",
+        lambda _symbol: (_ for _ in ()).throw(
+            services.MarketDataRateLimitError("rate limited")
+        ),
+    )
+    monkeypatch.setattr(services, "get_stock_quote", lambda _symbol: _quote())
+
+    info = services.get_stock_info("AAPL")
+
+    assert info.symbol == "AAPL"
+    assert info.name == "AAPL"
+    assert info.currency == "USD"
+
+
 def test_market_signals_first_request_only_schedules_background_refresh(monkeypatch):
     from app import market_signals
     scheduled = []

@@ -1,17 +1,18 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Briefcase, Plus, Trash2, Loader2, AlertTriangle, TrendingUp, TrendingDown, Pencil, BellRing,
 } from 'lucide-react';
 import { api, formatNumber, formatMoney, formatSignedMoney, formatSignedPct, formatPnl, inferCurrency } from '../api';
 import { useQuotePoll } from '../hooks/useQuotePoll';
+import { useBatchQuotes } from '../hooks/useBatchQuotes';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import PortfolioDashboard from '../components/PortfolioDashboard';
 import PortfolioIntelligence from '../components/PortfolioIntelligence';
 import PriceAlertButton, { AlertTriggeredBadge } from '../components/PriceAlertButton';
 
 export default function PortfolioPage() {
-  const [positions, setPositions] = useState([]);
+  const [savedPositions, setSavedPositions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [form, setForm] = useState({ symbol: '', shares: '', avg_cost: '' });
@@ -26,7 +27,7 @@ export default function PortfolioPage() {
     setLoading(true);
     try {
       const list = await api.listPositions();
-      setPositions(list);
+      setSavedPositions(list);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -35,7 +36,37 @@ export default function PortfolioPage() {
     }
   }, []);
 
-  useQuotePoll(load, { enabled: true });
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const symbols = useMemo(
+    () => savedPositions.map((position) => position.symbol),
+    [savedPositions],
+  );
+  const {
+    quotes,
+    errors: quoteErrors,
+    loading: quotesLoading,
+  } = useBatchQuotes(symbols, { enabled: !loading });
+  const positions = useMemo(() => savedPositions.map((position) => {
+    const quote = quotes[position.symbol];
+    const currentPrice = quote?.price ?? null;
+    const costBasis = position.shares * position.avg_cost;
+    const marketValue = currentPrice == null ? null : position.shares * currentPrice;
+    const pnl = marketValue == null ? null : marketValue - costBasis;
+    return {
+      ...position,
+      name: quote?.name || position.name || position.symbol,
+      current_price: currentPrice,
+      currency: quote?.currency || position.currency || inferCurrency(position.symbol),
+      cost_basis: costBasis,
+      market_value: marketValue,
+      unrealized_pnl: pnl,
+      unrealized_pnl_pct: pnl == null || !costBasis ? null : (pnl / costBasis) * 100,
+    };
+  }), [savedPositions, quotes]);
+  const unavailableQuoteCount = Object.keys(quoteErrors).length;
 
   const loadIntelligence = useCallback(async () => {
     setIntelligenceLoading(true);
@@ -101,9 +132,11 @@ export default function PortfolioPage() {
   };
 
   const totalCost = positions.reduce((s, p) => s + (p.cost_basis || 0), 0);
-  const totalValue = positions.reduce((s, p) => s + (p.market_value || 0), 0);
-  const totalPnl = totalValue - totalCost;
-  const totalPnlPct = totalCost ? (totalPnl / totalCost) * 100 : 0;
+  const pricedPositions = positions.filter((p) => p.market_value != null);
+  const totalValue = pricedPositions.reduce((s, p) => s + p.market_value, 0);
+  const pricedCost = pricedPositions.reduce((s, p) => s + (p.cost_basis || 0), 0);
+  const totalPnl = totalValue - pricedCost;
+  const totalPnlPct = pricedCost ? (totalPnl / pricedCost) * 100 : null;
   const currencies = [...new Set(positions.map((p) => p.currency).filter(Boolean))];
   const portfolioCurrency = currencies.length === 1 ? currencies[0] : null;
 
@@ -124,12 +157,23 @@ export default function PortfolioPage() {
         </div>
       )}
 
+      {!error && positions.length > 0 && unavailableQuoteCount > 0 && (
+        <div className="bg-warning/5 border border-warning/25 rounded-2xl p-4 flex items-center gap-3">
+          <AlertTriangle size={18} className="text-warning shrink-0" />
+          <p className="text-sm text-warning">
+            โหลดราคาปัจจุบันไม่ได้ {unavailableQuoteCount} รายการ แต่ข้อมูลพอร์ตที่บันทึกไว้ยังใช้งานได้
+          </p>
+        </div>
+      )}
+
       {positions.length > 0 && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <SummaryCard
               label="มูลค่ารวม"
-              value={formatNumber(totalValue, { compact: true }) ?? '-'}
+              value={pricedPositions.length > 0
+                ? (formatNumber(totalValue, { compact: true }) ?? '-')
+                : '-'}
               currency={portfolioCurrency}
             />
             <SummaryCard
@@ -139,14 +183,14 @@ export default function PortfolioPage() {
             />
             <SummaryCard
               label="กำไร/ขาดทุน"
-              value={formatSignedPct(totalPnlPct)}
-              suffix={`(${formatSignedMoney(totalPnl, portfolioCurrency, { compact: true })})`}
-              positive={totalPnl >= 0}
+              value={totalPnlPct == null ? '-' : formatSignedPct(totalPnlPct)}
+              suffix={totalPnlPct == null ? null : `(${formatSignedMoney(totalPnl, portfolioCurrency, { compact: true })})`}
+              positive={totalPnlPct == null ? undefined : totalPnl >= 0}
             />
             <SummaryCard
               label="% P/L"
-              value={formatSignedPct(totalPnlPct)}
-              positive={totalPnlPct >= 0}
+              value={totalPnlPct == null ? '-' : formatSignedPct(totalPnlPct)}
+              positive={totalPnlPct == null ? undefined : totalPnlPct >= 0}
             />
           </div>
           <PortfolioDashboard positions={positions} totalValue={totalValue} portfolioCurrency={portfolioCurrency} />
@@ -236,7 +280,13 @@ export default function PortfolioPage() {
                         </td>
                         <td className="py-3 px-4 text-right font-mono">{p.shares}</td>
                         <td className="py-3 px-4 text-right font-mono">{formatMoney(p.avg_cost, p.currency)}</td>
-                        <td className="py-3 px-4 text-right font-mono">{p.current_price != null ? formatMoney(p.current_price, p.currency) : '-'}</td>
+                        <td className="py-3 px-4 text-right font-mono">
+                          {p.current_price != null
+                            ? formatMoney(p.current_price, p.currency)
+                            : quotesLoading
+                              ? <Loader2 size={14} className="animate-spin inline text-muted" />
+                              : '-'}
+                        </td>
                         <td className="py-3 px-4 text-right font-mono">{p.market_value != null ? formatMoney(p.market_value, p.currency, { compact: true }) : '-'}</td>
                         <td className={`py-3 px-4 text-right font-mono font-bold ${(p.unrealized_pnl ?? 0) >= 0 ? 'text-success' : 'text-danger'}`}>
                           {p.unrealized_pnl != null ? (

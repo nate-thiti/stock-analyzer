@@ -52,6 +52,8 @@ export default function StockPage() {
   const { symbol } = useParams();
   const [quote, setQuote] = useState(null);
   const [info, setInfo] = useState(null);
+  const [infoLoading, setInfoLoading] = useState(true);
+  const [infoError, setInfoError] = useState(null);
   const [history, setHistory] = useState([]);
   const [analysis, setAnalysis] = useState(null);
   const [period, setPeriod] = useState('6mo');
@@ -167,15 +169,24 @@ export default function StockPage() {
       .catch(() => setPosition(null));
   }, [symbol]);
 
-  // โหลดข้อมูลบริษัทแยกจากวิเคราะห์ — ไม่ให้หายเมื่อ analysis ช้าหรือล้มเหลว
-  useEffect(() => {
+  const loadCompanyInfo = useCallback(async () => {
     if (!symbol) return;
-    let cancelled = false;
-    api.info(symbol)
-      .then((i) => { if (!cancelled) setInfo(i); })
-      .catch(() => { /* keep previous info */ });
-    return () => { cancelled = true; };
+    setInfoLoading(true);
+    setInfoError(null);
+    try {
+      setInfo(await api.info(symbol));
+    } catch (err) {
+      setInfoError(err.message);
+    } finally {
+      setInfoLoading(false);
+    }
   }, [symbol]);
+
+  // โหลดข้อมูลบริษัทแยกจากวิเคราะห์ และมีสถานะ retry เมื่อ upstream ล้ม
+  useEffect(() => {
+    setInfo(null);
+    loadCompanyInfo();
+  }, [loadCompanyInfo]);
 
   // โหลดวิเคราะห์แยก
   useEffect(() => {
@@ -432,10 +443,26 @@ export default function StockPage() {
             )}
           </div>
         )}
-        {!info && analysisLoading && (
-          <div className="glass-card rounded-2xl p-4 sm:p-5 h-full flex items-center justify-center text-sm text-muted min-h-[12rem]">
-            <Loader2 size={18} className="animate-spin text-primary mr-2" />
-            กำลังโหลดข้อมูลบริษัท...
+        {!info && (
+          <div className="glass-card rounded-2xl p-4 sm:p-5 h-full flex flex-col items-center justify-center text-sm text-muted min-h-[12rem] text-center">
+            {infoLoading ? (
+              <>
+                <Loader2 size={18} className="animate-spin text-primary mb-2" />
+                กำลังโหลดข้อมูลบริษัท...
+              </>
+            ) : (
+              <>
+                <AlertTriangle size={18} className="text-warning mb-2" />
+                <p>{infoError || 'ยังโหลดข้อมูลบริษัทไม่ได้'}</p>
+                <button
+                  type="button"
+                  onClick={loadCompanyInfo}
+                  className="mt-3 px-3 py-1.5 rounded-lg border border-primary/30 text-primary hover:bg-primary/5"
+                >
+                  ลองโหลดอีกครั้ง
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

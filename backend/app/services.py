@@ -13,9 +13,10 @@ from .market_hours import infer_market_state, merge_yahoo_info, pick_info_str
 
 QUOTE_CACHE_EXPIRY = int(os.getenv("QUOTE_CACHE_SECONDS", "300"))
 HISTORY_CACHE_EXPIRY = int(os.getenv("HISTORY_CACHE_SECONDS", "600"))
-RAW_CACHE_EXPIRY = int(os.getenv("RAW_CACHE_SECONDS", "900"))
+RAW_CACHE_EXPIRY = int(os.getenv("RAW_CACHE_SECONDS", "21600"))
 EVENT_CACHE_EXPIRY = int(os.getenv("EVENT_CACHE_SECONDS", "21600"))
 STALE_CACHE_EXPIRY = int(os.getenv("STALE_CACHE_SECONDS", "3600"))
+RAW_STALE_CACHE_EXPIRY = int(os.getenv("RAW_STALE_CACHE_SECONDS", "86400"))
 YAHOO_TIMEOUT_SECONDS = float(os.getenv("YAHOO_TIMEOUT_SECONDS", "12"))
 YAHOO_MAX_WORKERS = int(os.getenv("YAHOO_MAX_WORKERS", "6"))
 _provider_pool = ThreadPoolExecutor(max_workers=YAHOO_MAX_WORKERS, thread_name_prefix="yahoo")
@@ -76,8 +77,8 @@ def _cached(cache: Dict[str, Dict[str, Any]], key: str, max_age: int):
     return None
 
 
-def _stale(cache: Dict[str, Dict[str, Any]], key: str):
-    return _cached(cache, key, STALE_CACHE_EXPIRY)
+def _stale(cache: Dict[str, Dict[str, Any]], key: str, max_age: int = STALE_CACHE_EXPIRY):
+    return _cached(cache, key, max_age)
 
 
 def _claim_inflight(inflight: Dict[str, threading.Event], key: str) -> tuple[threading.Event, bool]:
@@ -332,7 +333,20 @@ def _dividends_from_yf(ticker) -> List[dict]:
 def _fetch_raw_data(cleaned: str) -> RawFinancials:
     ticker = _get_ticker(cleaned)
     info = _ticker_info(ticker)
-    income_quarters = _income_quarters_from_yf(ticker)
+
+    def partial(operation, fallback):
+        try:
+            return operation()
+        except Exception as error:
+            print(f"yfinance partial company data error for {cleaned}: {error}")
+            return fallback
+
+    # Company profile fields remain useful even when one of Yahoo's heavier
+    # financial/calendar endpoints is independently rate-limited.
+    income_quarters = partial(lambda: _income_quarters_from_yf(ticker), [])
+    balance_latest = partial(lambda: _balance_from_yf(ticker), None)
+    earnings = partial(lambda: _earnings_from_yf(ticker, info), [])
+    dividends = partial(lambda: _dividends_from_yf(ticker), [])
 
     shares = _safe_float(info.get("sharesOutstanding"))
     if income_quarters and shares and not income_quarters[0].get("diluted_shares_outstanding"):
@@ -347,9 +361,14 @@ def _fetch_raw_data(cleaned: str) -> RawFinancials:
         industry=pick_info_str(info, "industry", "industryDisp"),
         summary=info.get("longBusinessSummary"),
         income_quarters=income_quarters,
-        balance_latest=_balance_from_yf(ticker),
-        earnings=_earnings_from_yf(ticker, info),
-        dividends=_dividends_from_yf(ticker),
+        balance_latest=balance_latest,
+        earnings=earnings,
+        dividends=dividends,
+        market_cap=_safe_float(info.get("marketCap")),
+        dividend_yield=_safe_float(info.get("dividendYield")),
+        beta=_safe_float(info.get("beta")),
+        fifty_two_week_high=_safe_float(info.get("fiftyTwoWeekHigh")),
+        fifty_two_week_low=_safe_float(info.get("fiftyTwoWeekLow")),
     )
 
 
@@ -380,7 +399,7 @@ def get_raw_financials(symbol: str) -> RawFinancials:
         try:
             raw = _provider_call(f"financials:{cleaned}", lambda: _fetch_raw_data(cleaned))
         except MarketDataError:
-            stale = _stale(raw_cache, cleaned)
+            stale = _stale(raw_cache, cleaned, RAW_STALE_CACHE_EXPIRY)
             if stale is not None:
                 return stale
             raise
@@ -651,7 +670,21 @@ def get_stock_quotes(symbols: List[str]) -> tuple[Dict[str, StockQuote], Dict[st
 
 def get_stock_info(symbol: str, price: Optional[float] = None, history_df=None) -> Optional[StockInfo]:
     cleaned = clean_symbol(symbol)
-    raw = get_raw_financials(cleaned)
+    quote = None
+    try:
+        raw = get_raw_financials(cleaned)
+    except MarketDataError as raw_error:
+        # A quote can still provide a stable minimal company card. Do not make
+        # the whole card disappear because financial statements were limited.
+        quote = get_stock_quote(cleaned)
+        if quote is None:
+            raise raw_error
+        return StockInfo(
+            symbol=cleaned,
+            name=quote.name or cleaned,
+            currency=quote.currency,
+            exchange=quote.exchange,
+        )
 
     if price is None:
         quote = get_stock_quote(cleaned)
@@ -660,25 +693,16 @@ def get_stock_info(symbol: str, price: Optional[float] = None, history_df=None) 
         return None
 
     metrics = compute_fundamentals(price, raw, history_df)
-    try:
-        info = _provider_call(
-            f"info:{cleaned}",
-            lambda: _ticker_info_for_symbol(cleaned),
-        )
-    except MarketDataError:
-        if not any((raw.name, raw.summary, raw.sector, raw.industry)):
-            raise
-        info = {}
 
     dividends = raw.dividends or []
     annual_dividend = round(sum(d["amount"] for d in dividends[:4]), 4) if dividends else None
 
     return StockInfo(
-            symbol=cleaned,
-        name=raw.name or info.get("shortName") or info.get("longName"),
-        summary=raw.summary or info.get("longBusinessSummary"),
-        industry=raw.industry or pick_info_str(info, "industry", "industryDisp"),
-        sector=raw.sector or pick_info_str(info, "sector", "sectorDisp"),
+        symbol=cleaned,
+        name=raw.name or (quote.name if quote else None) or cleaned,
+        summary=raw.summary,
+        industry=raw.industry,
+        sector=raw.sector,
         dividends=dividends,
         annual_dividend=annual_dividend,
         pe_ratio=metrics.get("pe_ratio"),
@@ -692,13 +716,13 @@ def get_stock_info(symbol: str, price: Optional[float] = None, history_df=None) 
         profit_margin=metrics.get("net_margin"),
         revenue_growth=metrics.get("revenue_growth"),
         earnings_growth=metrics.get("earnings_growth"),
-        market_cap=metrics.get("market_cap") or _safe_float(info.get("marketCap")),
-        dividend_yield=metrics.get("dividend_yield") or _safe_float(info.get("dividendYield")),
-        beta=_safe_float(info.get("beta")),
-        fifty_two_week_high=metrics.get("fifty_two_week_high") or _safe_float(info.get("fiftyTwoWeekHigh")),
-        fifty_two_week_low=metrics.get("fifty_two_week_low") or _safe_float(info.get("fiftyTwoWeekLow")),
-        currency=raw.currency,
-        exchange=raw.exchange,
+        market_cap=metrics.get("market_cap") or raw.market_cap,
+        dividend_yield=metrics.get("dividend_yield") or raw.dividend_yield,
+        beta=raw.beta,
+        fifty_two_week_high=metrics.get("fifty_two_week_high") or raw.fifty_two_week_high,
+        fifty_two_week_low=metrics.get("fifty_two_week_low") or raw.fifty_two_week_low,
+        currency=raw.currency or (quote.currency if quote else None),
+        exchange=raw.exchange or (quote.exchange if quote else None),
     )
 
 

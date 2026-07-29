@@ -7,7 +7,6 @@ from ..database import get_db
 from ..models import User, Position
 from ..auth import get_current_user
 from ..auth_schemas import PositionOut, PositionCreate, PositionUpdate, PositionWithQuote
-from ..services import get_stock_quote, resolve_symbol_profile
 
 router = APIRouter(prefix="/api/positions", tags=["positions"])
 
@@ -19,32 +18,28 @@ def _clean_symbol(symbol: str) -> str:
 @router.get("", response_model=List[PositionWithQuote])
 def list_positions(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     positions = db.query(Position).filter(Position.user_id == user.id).order_by(Position.symbol).all()
-    result = []
-    for p in positions:
-        quote = get_stock_quote(p.symbol)
-        name, sector = resolve_symbol_profile(p.symbol)
-        current = quote.price if quote else None
-        cost_basis = p.shares * p.avg_cost
-        market_value = p.shares * current if current else None
-        pnl = market_value - cost_basis if market_value is not None else None
-        pnl_pct = (pnl / cost_basis * 100) if pnl is not None and cost_basis else None
-        result.append(PositionWithQuote(
+    # Keep persisted portfolio data independent from the market-data provider.
+    # Quotes are loaded by the frontend through the batch endpoint, so a Yahoo
+    # timeout/rate limit cannot make a user's saved positions disappear.
+    return [
+        PositionWithQuote(
             id=p.id,
             symbol=p.symbol,
             shares=p.shares,
             avg_cost=p.avg_cost,
             created_at=p.created_at,
             updated_at=p.updated_at,
-            current_price=current,
-            currency=quote.currency if quote else "USD",
-            name=name,
-            sector=sector,
-            market_value=round(market_value, 2) if market_value is not None else None,
-            cost_basis=round(cost_basis, 2),
-            unrealized_pnl=round(pnl, 2) if pnl is not None else None,
-            unrealized_pnl_pct=round(pnl_pct, 2) if pnl_pct is not None else None,
-        ))
-    return result
+            current_price=None,
+            currency=None,
+            name=p.symbol,
+            sector=None,
+            market_value=None,
+            cost_basis=round(p.shares * p.avg_cost, 2),
+            unrealized_pnl=None,
+            unrealized_pnl_pct=None,
+        )
+        for p in positions
+    ]
 
 
 @router.post("", response_model=PositionOut, status_code=201)

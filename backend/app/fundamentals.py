@@ -17,6 +17,11 @@ class RawFinancials:
     balance_latest: Optional[dict] = None
     earnings: List[dict] = field(default_factory=list)
     dividends: List[dict] = field(default_factory=list)
+    market_cap: Optional[float] = None
+    dividend_yield: Optional[float] = None
+    beta: Optional[float] = None
+    fifty_two_week_high: Optional[float] = None
+    fifty_two_week_low: Optional[float] = None
 
 
 def _f(val) -> Optional[float]:
