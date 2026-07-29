@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import {
-  BookOpen, ChevronRight, Home, Search, Star, Bell, Briefcase,
+  BookOpen, ChevronRight, Home, Star, Bell, Briefcase,
   GitCompare, BarChart3, LogIn, UserPlus,
 } from 'lucide-react';
 import {
@@ -187,10 +187,11 @@ export default function GuidePage() {
         <GuideBlock
           title="สัญญาณจากระบบ (Market Signals)"
           steps={[
-            'ระบบสแกนหุ้นใน watchlist แล้วจัดกลุ่ม: ควรซื้อ / ถือต่อ / ขาย',
+            'ระบบรวมหุ้นในพอร์ตกับ watchlist แล้วจัดกลุ่ม: ควรซื้อ / ถือต่อ / ขายหรือลดสัดส่วน',
+            'หุ้นในพอร์ตคำนวณจากต้นทุน P/L และเพดานความเสี่ยง ส่วนหุ้นที่ยังไม่ได้ถือคำนวณเป็นโอกาสใหม่',
             'Watchlist ทั่วไป — หุ้นที่ admin ตั้ง (default 15 ตัว)',
             'รายการโปรด — ใช้หุ้นที่คุณติดดาว (ถ้าไม่มีจะ fallback เป็น watchlist ทั่วไป)',
-            'อัปเดต auto ทุก 1 นาที — กด รีเฟรช เพื่อบังคับสแกนใหม่',
+            'ตรวจผลทุก 1 นาที และคำนวณชุดใหม่ทุก 15 นาที — กด รีเฟรช เพื่อบังคับสแกนใหม่',
             'ครั้งแรกอาจใช้เวลา 20–40 วินาที',
           ]}
           reverse
@@ -331,6 +332,17 @@ export default function GuidePage() {
             </MockFrame>
           }
         />
+        <GuideBlock
+          title="Portfolio Intelligence"
+          steps={[
+            'Health Score — สรุปการกระจุกตัว การกระจาย ความเสี่ยงขาลง และ correlation',
+            'Rebalancing Plan — แนะนำซื้อเพิ่ม/ลดสัดส่วนตามเพดานความเสี่ยงส่วนบุคคล',
+            'Correlation Matrix — ตรวจหุ้นที่เคลื่อนไหวคล้ายกันมากเกินไป',
+            'What-if Simulator — จำลองซื้อหรือขายโดยไม่แก้ข้อมูลพอร์ตจริง',
+            'Calendar — รวมวันประกาศงบและวันปันผลที่ Yahoo Finance มีข้อมูล',
+            'Benchmark — เทียบค่าประมาณผลตอบแทนพอร์ตกับ S&P 500, Nasdaq และ SET50',
+          ]}
+        />
       </GuideSection>
 
       {/* ── ติดดาว ── */}
@@ -440,11 +452,11 @@ export default function GuidePage() {
                   {[
                     ['หน้าหุ้น — ราคา / กราฟ / วิเคราะห์', '1 นาที'],
                     ['หน้าแรก — การ์ดราคา / ดูล่าสุด', '1 นาที'],
-                    ['Market Signals', '1 นาที'],
+                    ['Market Signals', 'ตรวจผล 1 นาที / คำนวณใหม่ 15 นาที'],
                     ['พอร์ต / ติดดาว', '1 นาที'],
                     ['Price Alerts (ตรวจ trigger)', '1 นาที'],
                     ['เปรียบเทียบหุ้น', 'เมื่อกดเปรียบเทียบเท่านั้น'],
-                    ['Backend cache (Yahoo Finance)', '1 นาที'],
+                    ['Backend cache (Yahoo Finance)', 'ราคา 5 นาที / ข้อมูลอื่น 10–15 นาที'],
                   ].map(([a, b]) => (
                     <tr key={a} className="border-b border-border/20">
                       <td className="py-2 pr-4">{a}</td>

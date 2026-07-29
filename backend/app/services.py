@@ -1,24 +1,110 @@
 import yfinance as yf
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError, as_completed
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+import os
 import time
 import threading
-from typing import Dict, Any, Optional, List
+from typing import Callable, Dict, Any, Optional, List, TypeVar
 from .schemas import StockQuote, StockHistoryItem, StockInfo
 from .fundamentals import RawFinancials, compute_fundamentals
 from .market_hours import infer_market_state, merge_yahoo_info, pick_info_str
 
-QUOTE_CACHE_EXPIRY = 60
-HISTORY_CACHE_EXPIRY = 60
-RAW_CACHE_EXPIRY = 60
+QUOTE_CACHE_EXPIRY = int(os.getenv("QUOTE_CACHE_SECONDS", "300"))
+HISTORY_CACHE_EXPIRY = int(os.getenv("HISTORY_CACHE_SECONDS", "600"))
+RAW_CACHE_EXPIRY = int(os.getenv("RAW_CACHE_SECONDS", "900"))
+EVENT_CACHE_EXPIRY = int(os.getenv("EVENT_CACHE_SECONDS", "21600"))
+STALE_CACHE_EXPIRY = int(os.getenv("STALE_CACHE_SECONDS", "3600"))
+YAHOO_TIMEOUT_SECONDS = float(os.getenv("YAHOO_TIMEOUT_SECONDS", "12"))
+YAHOO_MAX_WORKERS = int(os.getenv("YAHOO_MAX_WORKERS", "6"))
+_provider_pool = ThreadPoolExecutor(max_workers=YAHOO_MAX_WORKERS, thread_name_prefix="yahoo")
+_batch_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="quote-batch")
+T = TypeVar("T")
+
+
+class MarketDataError(RuntimeError):
+    status_code = 503
+    retry_after = 30
+
+
+class MarketDataRateLimitError(MarketDataError):
+    status_code = 429
+    retry_after = 300
+
+
+class MarketDataTimeoutError(MarketDataError):
+    status_code = 503
+    retry_after = 30
+
+
+def _is_rate_limit_error(error: BaseException) -> bool:
+    message = str(error).lower()
+    error_type = type(error).__name__.lower()
+    return (
+        "ratelimit" in error_type
+        or "too many requests" in message
+        or "rate limit" in message
+        or "429" in message
+    )
+
+
+def _provider_call(label: str, operation: Callable[[], T]) -> T:
+    """Bound Yahoo calls so a slow upstream cannot hold a request indefinitely."""
+    future = _provider_pool.submit(operation)
+    try:
+        return future.result(timeout=YAHOO_TIMEOUT_SECONDS)
+    except FutureTimeoutError as error:
+        future.cancel()
+        raise MarketDataTimeoutError(
+            f"ผู้ให้บริการข้อมูลใช้เวลาตอบนานเกินไป ({label})"
+        ) from error
+    except MarketDataError:
+        raise
+    except Exception as error:
+        if _is_rate_limit_error(error):
+            raise MarketDataRateLimitError(
+                "ผู้ให้บริการข้อมูลจำกัดจำนวนคำขอ กรุณาลองใหม่ภายหลัง"
+            ) from error
+        raise MarketDataError(f"ผู้ให้บริการข้อมูลขัดข้อง ({label})") from error
+
+
+def _cached(cache: Dict[str, Dict[str, Any]], key: str, max_age: int):
+    entry = cache.get(key)
+    if entry and time.time() - entry["timestamp"] < max_age:
+        return entry["data"]
+    return None
+
+
+def _stale(cache: Dict[str, Dict[str, Any]], key: str):
+    return _cached(cache, key, STALE_CACHE_EXPIRY)
+
+
+def _claim_inflight(inflight: Dict[str, threading.Event], key: str) -> tuple[threading.Event, bool]:
+    with _inflight_lock:
+        event = inflight.get(key)
+        if event is not None:
+            return event, False
+        event = threading.Event()
+        inflight[key] = event
+        return event, True
+
+
+def _release_inflight(inflight: Dict[str, threading.Event], key: str, event: threading.Event) -> None:
+    with _inflight_lock:
+        inflight.pop(key, None)
+        event.set()
+
 
 quote_cache: Dict[str, Dict[str, Any]] = {}
 raw_cache: Dict[str, Dict[str, Any]] = {}
 history_cache: Dict[str, Dict[str, Any]] = {}
 extended_cache: Dict[str, Dict[str, Any]] = {}
+event_cache: Dict[str, Dict[str, Any]] = {}
 _ticker_cache: Dict[str, Any] = {}
 _inflight_raw: Dict[str, threading.Event] = {}
+_inflight_quote: Dict[str, threading.Event] = {}
+_inflight_history: Dict[str, threading.Event] = {}
 _inflight_lock = threading.Lock()
 
 PERIOD_MAP = {
@@ -58,12 +144,10 @@ def _ticker_info(ticker) -> dict:
 
 
 def _ticker_info_for_symbol(symbol: str) -> dict:
-    """Load Yahoo info; retry once with a fresh ticker if the payload is too sparse."""
+    """Load Yahoo info; retry only when Yahoo returned no payload at all."""
     cleaned = clean_symbol(symbol)
     info = merge_yahoo_info(_get_ticker(cleaned))
-    has_time = bool(info.get("regularMarketTime") or info.get("postMarketTime") or info.get("preMarketTime"))
-    has_extended = bool(info.get("preMarketPrice") or info.get("postMarketPrice"))
-    if not has_time and not has_extended:
+    if not info:
         _ticker_cache.pop(cleaned, None)
         info = merge_yahoo_info(_get_ticker(cleaned))
     return info
@@ -156,6 +240,8 @@ def _income_quarters_from_yf(ticker) -> List[dict]:
             })
         return quarters
     except Exception as e:
+        if _is_rate_limit_error(e):
+            raise
         print(f"yfinance income error: {e}")
         return []
 
@@ -199,6 +285,8 @@ def _balance_from_yf(ticker) -> Optional[dict]:
             },
         }
     except Exception as e:
+        if _is_rate_limit_error(e):
+            raise
         print(f"yfinance balance error: {e}")
         return None
 
@@ -215,7 +303,9 @@ def _earnings_from_yf(ticker, info: dict) -> List[dict]:
             est = _safe_float(cal["Earnings Estimate"])
             if est and not earnings:
                 earnings.append({"eps_estimate": est})
-    except Exception:
+    except Exception as error:
+        if _is_rate_limit_error(error):
+            raise
         pass
 
     return earnings
@@ -233,7 +323,9 @@ def _dividends_from_yf(ticker) -> List[dict]:
                 "amount": float(amount),
             })
         return list(reversed(items))
-    except Exception:
+    except Exception as error:
+        if _is_rate_limit_error(error):
+            raise
         return []
 
 
@@ -263,10 +355,10 @@ def _fetch_raw_data(cleaned: str) -> RawFinancials:
 
 def get_raw_financials(symbol: str) -> RawFinancials:
     cleaned = clean_symbol(symbol)
-    now = time.time()
 
-    if cleaned in raw_cache and now - raw_cache[cleaned]["timestamp"] < RAW_CACHE_EXPIRY:
-        return raw_cache[cleaned]["data"]
+    cached = _cached(raw_cache, cleaned, RAW_CACHE_EXPIRY)
+    if cached is not None:
+        return cached
 
     with _inflight_lock:
         if cleaned in _inflight_raw:
@@ -278,13 +370,20 @@ def get_raw_financials(symbol: str) -> RawFinancials:
             is_owner = True
 
     if not is_owner:
-        evt.wait(timeout=30)
-        if cleaned in raw_cache:
-            return raw_cache[cleaned]["data"]
-        return RawFinancials(symbol=cleaned)
+        evt.wait(timeout=YAHOO_TIMEOUT_SECONDS)
+        cached = _stale(raw_cache, cleaned)
+        if cached is not None:
+            return cached
+        raise MarketDataTimeoutError("กำลังรอข้อมูลการเงินชุดเดียวกันนานเกินไป")
 
     try:
-        raw = _fetch_raw_data(cleaned)
+        try:
+            raw = _provider_call(f"financials:{cleaned}", lambda: _fetch_raw_data(cleaned))
+        except MarketDataError:
+            stale = _stale(raw_cache, cleaned)
+            if stale is not None:
+                return stale
+            raise
         raw_cache[cleaned] = {"timestamp": time.time(), "data": raw}
         return raw
     finally:
@@ -443,74 +542,111 @@ def _extended_session(
     }
 
 
+def _fetch_stock_quote(cleaned: str) -> Optional[StockQuote]:
+    ticker = _get_ticker(cleaned)
+    info = _ticker_info_for_symbol(cleaned)
+    hist = ticker.history(
+        period="5d",
+        timeout=YAHOO_TIMEOUT_SECONDS,
+        raise_errors=True,
+    )
+
+    if hist.empty:
+        return None
+
+    market_time, market_state, exchange_timezone = _quote_market_time(info, hist, cleaned)
+    if not market_state:
+        market_state = infer_market_state(cleaned, exchange_timezone)
+    fetched_at = datetime.now(timezone.utc).isoformat()
+
+    regular_price = _optional_quote_float(info.get("regularMarketPrice"))
+    prev_close = _optional_quote_float(
+        info.get("regularMarketPreviousClose") or info.get("previousClose")
+    )
+
+    if regular_price is not None:
+        price = regular_price
+        if prev_close is not None:
+            change = round(price - prev_close, 2)
+            change_pct = round(change / prev_close * 100, 2) if prev_close else 0
+        else:
+            change = round(float(hist["Close"].iloc[-1]) - float(hist["Close"].iloc[-2]), 2) if len(hist) > 1 else 0
+            change_pct = round(change / float(hist["Close"].iloc[-2]) * 100, 2) if len(hist) > 1 else 0
+    else:
+        price = round(float(hist["Close"].iloc[-1]), 2)
+        prev = float(hist["Close"].iloc[-2]) if len(hist) > 1 else price
+        change = round(price - prev, 2)
+        change_pct = round(change / prev * 100, 2) if prev else 0
+
+    extended = _extended_session(info, market_state, prev_close or price, ticker=ticker, symbol=cleaned)
+
+    day_open, day_high, day_low = _day_stats_from_quote(info, hist, market_state)
+    return StockQuote(
+        symbol=cleaned,
+        name=info.get("shortName") or info.get("longName") or cleaned,
+        price=price,
+        change=change,
+        change_percent=change_pct,
+        currency=info.get("currency", "USD"),
+        exchange=info.get("exchange") or info.get("fullExchangeName") or "Unknown",
+        market_time=market_time,
+        market_state=market_state,
+        exchange_timezone=exchange_timezone,
+        fetched_at=fetched_at,
+        day_open=day_open,
+        day_high=day_high,
+        day_low=day_low,
+        **extended,
+    )
+
+
 def get_stock_quote(symbol: str) -> Optional[StockQuote]:
     cleaned = clean_symbol(symbol)
-    now = time.time()
-    
-    if cleaned in quote_cache and now - quote_cache[cleaned]["timestamp"] < QUOTE_CACHE_EXPIRY:
-        cached = quote_cache[cleaned]["data"]
-        if isinstance(cached, StockQuote):
-            return cached
+    cached = _cached(quote_cache, cleaned, QUOTE_CACHE_EXPIRY)
+    if cached is not None:
         return cached
 
+    event, is_owner = _claim_inflight(_inflight_quote, cleaned)
+    if not is_owner:
+        event.wait(timeout=YAHOO_TIMEOUT_SECONDS)
+        cached = _stale(quote_cache, cleaned)
+        if cached is not None:
+            return cached
+        raise MarketDataTimeoutError("กำลังรอราคาหุ้นชุดเดียวกันนานเกินไป")
+
     try:
-        ticker = _get_ticker(cleaned)
-        info = _ticker_info_for_symbol(cleaned)
-        hist = ticker.history(period="5d")
+        try:
+            quote = _provider_call(f"quote:{cleaned}", lambda: _fetch_stock_quote(cleaned))
+            if quote is not None:
+                quote_cache[cleaned] = {"timestamp": time.time(), "data": quote}
+            return quote
+        except MarketDataError as error:
+            stale = _stale(quote_cache, cleaned)
+            if stale is not None:
+                print(f"yfinance quote stale fallback for {cleaned}: {error}")
+                return stale
+            print(f"yfinance quote error for {cleaned}: {error}")
+            raise
+    finally:
+        _release_inflight(_inflight_quote, cleaned, event)
 
-        if hist.empty:
-            return None
 
-        market_time, market_state, exchange_timezone = _quote_market_time(info, hist, cleaned)
-        if not market_state:
-            market_state = infer_market_state(cleaned, exchange_timezone)
-        fetched_at = datetime.now(timezone.utc).isoformat()
-
-        regular_price = _optional_quote_float(info.get("regularMarketPrice"))
-        prev_close = _optional_quote_float(
-            info.get("regularMarketPreviousClose") or info.get("previousClose")
-        )
-
-        if regular_price is not None:
-            price = regular_price
-            if prev_close is not None:
-                change = round(price - prev_close, 2)
-                change_pct = round(change / prev_close * 100, 2) if prev_close else 0
+def get_stock_quotes(symbols: List[str]) -> tuple[Dict[str, StockQuote], Dict[str, str]]:
+    cleaned = list(dict.fromkeys(clean_symbol(symbol) for symbol in symbols if symbol.strip()))
+    quotes: Dict[str, StockQuote] = {}
+    errors: Dict[str, str] = {}
+    futures = {_batch_pool.submit(get_stock_quote, symbol): symbol for symbol in cleaned}
+    for future in as_completed(futures):
+        symbol = futures[future]
+        try:
+            quote = future.result()
+            if quote is not None:
+                quotes[symbol] = quote
             else:
-                change = round(float(hist["Close"].iloc[-1]) - float(hist["Close"].iloc[-2]), 2) if len(hist) > 1 else 0
-                change_pct = round(change / float(hist["Close"].iloc[-2]) * 100, 2) if len(hist) > 1 else 0
-        else:
-            price = round(float(hist["Close"].iloc[-1]), 2)
-            prev = float(hist["Close"].iloc[-2]) if len(hist) > 1 else price
-            change = round(price - prev, 2)
-            change_pct = round(change / prev * 100, 2) if prev else 0
-
-        extended = _extended_session(info, market_state, prev_close or price, ticker=ticker, symbol=cleaned)
-
-        day_open, day_high, day_low = _day_stats_from_quote(info, hist, market_state)
-        
-        quote = StockQuote(
-            symbol=cleaned,
-            name=info.get("shortName") or info.get("longName") or cleaned,
-            price=price,
-            change=change,
-            change_percent=change_pct,
-            currency=info.get("currency", "USD"),
-            exchange=info.get("exchange") or info.get("fullExchangeName") or "Unknown",
-            market_time=market_time,
-            market_state=market_state,
-            exchange_timezone=exchange_timezone,
-            fetched_at=fetched_at,
-            day_open=day_open,
-            day_high=day_high,
-            day_low=day_low,
-            **extended,
-        )
-        quote_cache[cleaned] = {"timestamp": now, "data": quote}
-        return quote
-    except Exception as e:
-        print(f"yfinance quote error for {cleaned}: {e}")
-        return None
+                errors[symbol] = "ไม่พบข้อมูลหุ้น"
+        except MarketDataError as error:
+            errors[symbol] = str(error)
+    return quotes, errors
 
 
 def get_stock_info(symbol: str, price: Optional[float] = None, history_df=None) -> Optional[StockInfo]:
@@ -524,7 +660,15 @@ def get_stock_info(symbol: str, price: Optional[float] = None, history_df=None) 
         return None
 
     metrics = compute_fundamentals(price, raw, history_df)
-    info = _ticker_info_for_symbol(cleaned)
+    try:
+        info = _provider_call(
+            f"info:{cleaned}",
+            lambda: _ticker_info_for_symbol(cleaned),
+        )
+    except MarketDataError:
+        if not any((raw.name, raw.summary, raw.sector, raw.industry)):
+            raise
+        info = {}
 
     dividends = raw.dividends or []
     annual_dividend = round(sum(d["amount"] for d in dividends[:4]), 4) if dividends else None
@@ -567,7 +711,10 @@ def resolve_symbol_profile(symbol: str) -> tuple[Optional[str], Optional[str]]:
     if name and sector:
         return name, sector
     try:
-        info = _ticker_info(_get_ticker(cleaned))
+        info = _provider_call(
+            f"profile:{cleaned}",
+            lambda: _ticker_info(_get_ticker(cleaned)),
+        )
         if not name:
             name = pick_info_str(info, "shortName", "longName")
         if not sector:
@@ -580,6 +727,74 @@ def resolve_symbol_profile(symbol: str) -> tuple[Optional[str], Optional[str]]:
 def get_fundamental_metrics(symbol: str, price: float, history_df=None) -> dict:
     raw = get_raw_financials(symbol)
     return compute_fundamentals(price, raw, history_df)
+
+
+def get_provider_history(symbol: str, **kwargs):
+    """Timed Yahoo history helper for specialized chart builders."""
+    cleaned = clean_symbol(symbol)
+    params = dict(kwargs)
+    params.setdefault("timeout", YAHOO_TIMEOUT_SECONDS)
+    params.setdefault("raise_errors", True)
+    return _provider_call(
+        f"history-special:{cleaned}",
+        lambda: _get_ticker(cleaned).history(**params),
+    )
+
+
+def _event_date(value) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else None
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value, tz=timezone.utc).date().isoformat()
+    try:
+        return pd.Timestamp(value).date().isoformat()
+    except Exception:
+        return None
+
+
+def get_corporate_events(symbol: str) -> List[dict]:
+    """Upcoming earnings/dividend dates, cached separately because they change slowly."""
+    cleaned = clean_symbol(symbol)
+    cached = _cached(event_cache, cleaned, EVENT_CACHE_EXPIRY)
+    if cached is not None:
+        return cached
+
+    def fetch() -> List[dict]:
+        ticker = _get_ticker(cleaned)
+        calendar = ticker.calendar
+        info = _ticker_info_for_symbol(cleaned)
+        events: List[dict] = []
+
+        if isinstance(calendar, dict):
+            earnings_date = _event_date(calendar.get("Earnings Date"))
+            if earnings_date:
+                events.append({"symbol": cleaned, "type": "earnings", "date": earnings_date})
+            dividend_date = _event_date(
+                calendar.get("Ex-Dividend Date") or calendar.get("Dividend Date")
+            )
+            if dividend_date:
+                events.append({"symbol": cleaned, "type": "dividend", "date": dividend_date})
+
+        ex_dividend = _event_date(info.get("exDividendDate"))
+        if ex_dividend and not any(
+            event["type"] == "dividend" and event["date"] == ex_dividend for event in events
+        ):
+            events.append({"symbol": cleaned, "type": "dividend", "date": ex_dividend})
+        return events
+
+    try:
+        events = _provider_call(f"events:{cleaned}", fetch)
+        event_cache[cleaned] = {"timestamp": time.time(), "data": events}
+        return events
+    except MarketDataError:
+        stale = _cached(event_cache, cleaned, 86_400)
+        if stale is not None:
+            return stale
+        return []
 
 
 def _format_history_time(idx, interval: str, tz_name: Optional[str] = None) -> str:
@@ -624,40 +839,64 @@ def get_stock_history(symbol: str, period: str = "1mo", interval: str = "1d") ->
     yf_period = PERIOD_MAP.get(period, "6mo")
     yf_interval = INTERVAL_MAP.get(interval, "1d")
     cache_key = f"{cleaned}_{yf_period}_{yf_interval}"
-    now = time.time()
-    
-    if cache_key in history_cache and now - history_cache[cache_key]["timestamp"] < HISTORY_CACHE_EXPIRY:
-        return history_cache[cache_key]["data"]
+    cached = _cached(history_cache, cache_key, HISTORY_CACHE_EXPIRY)
+    if cached is not None:
+        return cached
+
+    event, is_owner = _claim_inflight(_inflight_history, cache_key)
+    if not is_owner:
+        event.wait(timeout=YAHOO_TIMEOUT_SECONDS)
+        cached = _stale(history_cache, cache_key)
+        if cached is not None:
+            return cached
+        raise MarketDataTimeoutError("กำลังรอประวัติราคาชุดเดียวกันนานเกินไป")
 
     try:
-        ticker = _get_ticker(cleaned)
-        info = _ticker_info(ticker)
-        tz_name = info.get("exchangeTimezoneName")
-        df = ticker.history(period=yf_period, interval=yf_interval)
-        if df.empty:
-            return []
-        
-        history = []
-        for idx, row in df.iterrows():
-            history.append(StockHistoryItem(
-                time=_format_history_time(idx, yf_interval, tz_name),
-                open=round(float(row["Open"]), 2),
-                high=round(float(row["High"]), 2),
-                low=round(float(row["Low"]), 2),
-                close=round(float(row["Close"]), 2),
-                volume=int(row["Volume"]) if pd.notna(row["Volume"]) else 0,
-            ))
+        try:
+            def fetch():
+                ticker = _get_ticker(cleaned)
+                info = _ticker_info(ticker)
+                return info.get("exchangeTimezoneName"), ticker.history(
+                    period=yf_period,
+                    interval=yf_interval,
+                    timeout=YAHOO_TIMEOUT_SECONDS,
+                    raise_errors=True,
+                )
 
-        history_cache[cache_key] = {"timestamp": now, "data": history}
-        return history
-    except Exception as e:
-        print(f"yfinance history error for {cleaned}: {e}")
-        return []
+            tz_name, df = _provider_call(f"history:{cache_key}", fetch)
+            if df.empty:
+                return []
+
+            history = []
+            for idx, row in df.iterrows():
+                history.append(StockHistoryItem(
+                    time=_format_history_time(idx, yf_interval, tz_name),
+                    open=round(float(row["Open"]), 2),
+                    high=round(float(row["High"]), 2),
+                    low=round(float(row["Low"]), 2),
+                    close=round(float(row["Close"]), 2),
+                    volume=int(row["Volume"]) if pd.notna(row["Volume"]) else 0,
+                ))
+
+            history_cache[cache_key] = {"timestamp": time.time(), "data": history}
+            return history
+        except MarketDataError as error:
+            stale = _stale(history_cache, cache_key)
+            if stale is not None:
+                print(f"yfinance history stale fallback for {cleaned}: {error}")
+                return stale
+            print(f"yfinance history error for {cleaned}: {error}")
+            raise
+    finally:
+        _release_inflight(_inflight_history, cache_key, event)
 
 
 def search_symbols(query: str, limit: int = 10) -> List[dict]:
     try:
-        results = yf.Search(query, max_results=limit)
+        results = _provider_call(
+            f"search:{query}",
+            lambda: yf.Search(query, max_results=limit, timeout=YAHOO_TIMEOUT_SECONDS),
+        )
         items = []
         for q in (results.quotes or [])[:limit]:
             sym = q.get("symbol", "")
@@ -669,6 +908,6 @@ def search_symbols(query: str, limit: int = 10) -> List[dict]:
                     "type": q.get("quoteType"),
                 })
         return items
-    except Exception as e:
-        print(f"yfinance search error: {e}")
-        return []
+    except MarketDataError as error:
+        print(f"yfinance search error: {error}")
+        raise

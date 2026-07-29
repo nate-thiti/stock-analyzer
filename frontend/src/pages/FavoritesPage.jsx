@@ -1,9 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react';
-import { api, inferCurrency, formatMoney } from '../api';
 import { useFavorites } from '../context/FavoritesContext';
-import { useQuotePoll } from '../hooks/useQuotePoll';
+import { useBatchQuotes } from '../hooks/useBatchQuotes';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import PriceAlertButton, { AlertTriggeredBadge } from '../components/PriceAlertButton';
 import MarketStateBadge from '../components/MarketStateBadge';
@@ -11,6 +9,8 @@ import MarketStateBadge from '../components/MarketStateBadge';
 export default function FavoritesPage() {
   const { favorites, loading: favLoading } = useFavorites();
   const { alerts, load: reloadAlerts, triggered } = usePriceAlerts();
+  const favoriteSymbols = favorites.map((favorite) => favorite.symbol);
+  const { quotes } = useBatchQuotes(favoriteSymbols, { enabled: !favLoading });
 
   return (
     <div className="space-y-6 w-full min-w-0">
@@ -45,7 +45,13 @@ export default function FavoritesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {favorites.map((f) => (
-            <FavoriteCard key={f.symbol} symbol={f.symbol} alerts={alerts} onAlertChange={reloadAlerts} />
+            <FavoriteCard
+              key={f.symbol}
+              symbol={f.symbol}
+              quote={quotes[f.symbol]}
+              alerts={alerts}
+              onAlertChange={reloadAlerts}
+            />
           ))}
         </div>
       )}
@@ -53,20 +59,9 @@ export default function FavoritesPage() {
   );
 }
 
-function FavoriteCard({ symbol, alerts, onAlertChange }) {
-  const [quote, setQuote] = useState(null);
+function FavoriteCard({ symbol, quote, alerts, onAlertChange }) {
   const { toggle } = useFavorites();
   const hasTriggered = alerts.some((a) => a.symbol === symbol && a.triggered);
-
-  const refreshQuote = useCallback(async () => {
-    try {
-      const q = await api.quote(symbol);
-      setQuote(q);
-    } catch { /* keep stale */ }
-  }, [symbol]);
-
-  useEffect(() => { refreshQuote(); }, [refreshQuote]);
-  useQuotePoll(refreshQuote);
 
   const isUp = quote?.change >= 0;
 

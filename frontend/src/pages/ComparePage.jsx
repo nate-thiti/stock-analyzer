@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   GitCompare, AlertTriangle, Trophy, ArrowRight, Search, X, Plus,
-  Loader2, ChevronDown, ChevronUp, Sparkles, Link2, Check,
+  Loader2, ChevronDown, ChevronUp, Sparkles, Link2, Check, Briefcase, ShieldCheck,
 } from 'lucide-react';
 import { api, ACTION_STYLES, GRADE_LABELS, POPULAR_STOCKS, COMPARE_PRESET_GROUPS, formatPct, formatMoney } from '../api';
 import CompareValuationChart from '../components/valuation/CompareValuationChart';
+import { riskToleranceLabel, useRiskProfile, RISK_USAGE_BAND_LABELS } from '../context/RiskProfileContext';
 
 const MAX_STOCKS = 5;
 const MIN_STOCKS = 2;
@@ -62,6 +63,40 @@ const METRIC_GROUPS = [
       { label: 'R:R', get: (r) => (r.trading_plan?.risk_reward_ratio ? `1:${r.trading_plan.risk_reward_ratio}` : '-') },
     ],
   },
+  {
+    title: 'พอร์ต & ความเสี่ยงส่วนบุคคล',
+    rows: [
+      {
+        label: 'สถานะในพอร์ต',
+        get: (r) => r.holding
+          ? <span className="font-bold text-primary">ถืออยู่</span>
+          : <span className="text-muted">ยังไม่มี</span>,
+      },
+      { label: 'จำนวนที่ถือ', get: (r) => r.holding ? r.holding.shares.toLocaleString() : '-' },
+      { label: 'ต้นทุนเฉลี่ย', get: (r) => r.holding ? formatMoney(r.holding.avg_cost, r.currency) : '-' },
+      { label: 'กำไร/ขาดทุน', get: (r) => <PortfolioPnl holding={r.holding} /> },
+      {
+        label: 'สัดส่วนในพอร์ต',
+        get: (r) => r.holding?.position_pct != null ? `${r.holding.position_pct}%` : '-',
+      },
+      {
+        label: 'คำแนะนำสำหรับคุณ',
+        get: (r) => r.personalized_risk?.action_label || '-',
+      },
+      {
+        label: 'ใช้ขีดจำกัดความเสี่ยง',
+        get: (r) => r.personalized_risk?.risk_usage_pct != null
+          ? `${r.personalized_risk.risk_usage_pct}%`
+          : '-',
+      },
+      {
+        label: 'Stop ที่เหมาะกับคุณ',
+        get: (r) => r.personalized_risk?.effective_stop != null
+          ? formatMoney(r.personalized_risk.effective_stop, r.currency)
+          : '-',
+      },
+    ],
+  },
 ];
 
 function parseSymbols(raw) {
@@ -95,6 +130,7 @@ export default function ComparePage() {
     return findMatchingPreset(initial);
   });
   const [copied, setCopied] = useState(false);
+  const { profile } = useRiskProfile();
 
   const quickAddItems = activePreset
     ? (PRESETS.find((p) => p.label === activePreset)?.symbols ?? []).map((symbol) => ({ symbol }))
@@ -203,8 +239,30 @@ export default function ComparePage() {
           <GitCompare size={24} className="text-primary" />
           เปรียบเทียบหุ้น
         </h2>
-        <p className="text-sm text-muted mt-1">เลือก 2–5 หุ้น แล้วดูคำแนะนำและมูลค่าแบบ side-by-side</p>
+        <p className="text-sm text-muted mt-1">เลือก 2–5 หุ้น แล้วเปรียบเทียบโดยรวมสถานะในพอร์ตและความเสี่ยงส่วนบุคคล</p>
       </div>
+
+      {profile?.configured ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-primary/25 bg-primary/5 px-4 py-3 text-xs">
+          <span className="flex items-center gap-1.5 font-bold text-primary">
+            <ShieldCheck size={15} /> ใช้โปรไฟล์ความเสี่ยงของคุณ
+          </span>
+          <span className="text-muted">
+            ยอมรับขาดทุน {profile.max_loss_tolerance_pct}% ({riskToleranceLabel(profile.max_loss_tolerance_pct)})
+          </span>
+          <span className="text-muted">เพดานต่อหุ้น {profile.max_position_pct}%</span>
+          <span className="text-muted">เสี่ยงต่อครั้ง {profile.risk_per_trade_pct}%</span>
+          <span className="text-muted">ฐานคำนวณพอร์ต {profile.effective_account_size?.toLocaleString()}</span>
+        </div>
+      ) : (
+        <Link
+          to="/settings"
+          className="flex items-center gap-2 rounded-2xl border border-warning/25 bg-warning/5 px-4 py-3 text-xs text-warning hover:border-warning/50"
+        >
+          <AlertTriangle size={15} />
+          ตั้งค่าโปรไฟล์ความเสี่ยงก่อน เพื่อให้ผลเปรียบเทียบคำนวณตามขีดจำกัดของคุณ
+        </Link>
+      )}
 
       {/* เลือกหุ้น */}
       <div className="glass-card rounded-2xl p-5 space-y-4">
@@ -370,7 +428,7 @@ export default function ComparePage() {
           <Trophy size={24} className="text-success shrink-0" />
           <div>
             <p className="text-sm font-bold text-success">
-              ตัวเลือกที่ดีที่สุด: {data.best_pick}
+              เหมาะที่สุดตามข้อมูลพอร์ตและความเสี่ยงของคุณ: {data.best_pick}
             </p>
             <p className="text-xs text-muted mt-1">{data.summary}</p>
           </div>
@@ -448,6 +506,8 @@ function CompareStockCard({ result: r, isBest }) {
   const trend = r.trend?.trend_direction?.replace('_', ' ') || '-';
   const trendColor = r.trend?.trend_direction?.includes('up') ? 'text-success'
     : r.trend?.trend_direction?.includes('down') ? 'text-danger' : 'text-warning';
+  const personalized = r.personalized_risk;
+  const riskBand = RISK_USAGE_BAND_LABELS[personalized?.risk_usage_band];
 
   return (
     <Link
@@ -462,8 +522,15 @@ function CompareStockCard({ result: r, isBest }) {
         </span>
       )}
 
-      <div className="flex items-center justify-between mb-3">
-        <span className="font-mono font-black text-xl text-foreground">{r.symbol}</span>
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-mono font-black text-xl text-foreground">{r.symbol}</span>
+          {r.holding && (
+            <span className="inline-flex items-center gap-1 rounded-md border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-xs font-bold text-primary">
+              <Briefcase size={10} /> ในพอร์ต
+            </span>
+          )}
+        </div>
         <ArrowRight size={16} className="text-muted group-hover:text-primary transition-colors" />
       </div>
 
@@ -497,8 +564,51 @@ function CompareStockCard({ result: r, isBest }) {
           SL {formatMoney(r.trading_plan.stop_loss, r.currency)} → Target {formatMoney(r.trading_plan.target_price, r.currency)}
         </p>
       )}
+
+      {r.holding && (
+        <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-border/40 bg-surface/40 p-2.5">
+          <MiniStat label="ถือ / ต้นทุน" value={`${r.holding.shares.toLocaleString()} @ ${formatMoney(r.holding.avg_cost, r.currency)}`} />
+          <PortfolioPnl holding={r.holding} compact />
+        </div>
+      )}
+
+      {personalized && (
+        <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
+          <p className="flex items-center gap-1.5 text-xs font-bold text-primary">
+            <ShieldCheck size={13} /> {personalized.action_label}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">{personalized.summary}</p>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
+            {personalized.position_pct != null && <span>สัดส่วน {personalized.position_pct}%</span>}
+            {personalized.risk_usage_pct != null && (
+              <span className={personalized.risk_usage_pct >= 75 ? 'text-warning' : ''}>
+                ใช้ขีดจำกัด {personalized.risk_usage_pct}%{riskBand ? ` • ${riskBand}` : ''}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </Link>
   );
+}
+
+function PortfolioPnl({ holding, compact = false }) {
+  if (!holding) return '-';
+  const isPositive = holding.unrealized_pnl >= 0;
+  const value = `${isPositive ? '+' : ''}${holding.unrealized_pnl_pct.toFixed(2)}%`;
+
+  if (compact) {
+    return (
+      <div className="bg-surface/50 rounded-lg py-1.5 px-2 text-center border border-border/30">
+        <p className="text-xs text-muted uppercase">P/L พอร์ต</p>
+        <p className={`text-xs font-mono font-bold mt-0.5 ${isPositive ? 'text-success' : 'text-danger'}`}>
+          {value}
+        </p>
+      </div>
+    );
+  }
+
+  return <span className={`font-bold ${isPositive ? 'text-success' : 'text-danger'}`}>{value}</span>;
 }
 
 function MiniStat({ label, value }) {

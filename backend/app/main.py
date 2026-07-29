@@ -1,6 +1,7 @@
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Query, Depends, APIRouter
+from fastapi import FastAPI, HTTPException, Query, Depends, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import os
 import pandas as pd
 import asyncio
@@ -9,18 +10,22 @@ from .init_db import init_db
 from .auth import get_current_user
 from .database import get_db
 from .models import User, Position
-from .routers import auth, users, favorites, positions, watchlist, price_alerts, risk_profile
+from .routers import (
+    auth, users, favorites, positions, watchlist, price_alerts, risk_profile,
+    portfolio_intelligence,
+)
 from sqlalchemy.orm import Session
 from .schemas import (
-    StockQuote, StockHistoryResponse, StockInfo, CSVImportRequest, CSVExportRequest,
+    StockQuote, QuoteBatchResponse, StockHistoryResponse, StockInfo, CSVImportRequest, CSVExportRequest,
     AnalysisResponse, ComparisonResponse, BatchAnalysisRequest, SearchResult,
     QuarterlyFundamentalsResponse, QuarterlyFundamentalItem,
     ValuationHistoryResponse, ValuationHistoryItem,
-    MarketSignalsResponse, PersonalizedRiskOut,
+    MarketSignalsResponse, PersonalizedRiskOut, HoldingContextOut,
 )
 from .market_signals import get_market_signals
 from .services import (
-    get_stock_quote, get_stock_history, get_stock_info, get_fundamental_metrics, search_symbols,
+    MarketDataError, get_stock_quote, get_stock_quotes, get_stock_history, get_stock_info,
+    get_fundamental_metrics, search_symbols,
 )
 from .valuation_charts import build_quarterly_series, build_pe_history
 from .analysis import (
@@ -52,8 +57,18 @@ app.include_router(positions.router)
 app.include_router(watchlist.router)
 app.include_router(price_alerts.router)
 app.include_router(risk_profile.router)
+app.include_router(portfolio_intelligence.router)
 
 protected = APIRouter(dependencies=[Depends(get_current_user)])
+
+
+@app.exception_handler(MarketDataError)
+async def market_data_error_handler(_request: Request, error: MarketDataError):
+    return JSONResponse(
+        status_code=error.status_code,
+        content={"detail": str(error)},
+        headers={"Retry-After": str(error.retry_after)},
+    )
 
 
 @app.on_event("startup")
@@ -69,13 +84,58 @@ def _history_to_df(history) -> pd.DataFrame:
     return df
 
 
-def _compute_position_pct(user: User, db: Session, market_value: Optional[float]) -> Optional[float]:
+def _compute_position_pct(market_value: Optional[float], account_size: float) -> Optional[float]:
     if not market_value or market_value <= 0:
         return None
-    base = resolve_account_size(db, user.id, 100_000.0)
-    if base <= 0:
+    if account_size <= 0:
         return None
-    return round(market_value / base * 100, 1)
+    return round(market_value / account_size * 100, 1)
+
+
+def _build_holding_context(position: Position, current_price: float, account_size: float) -> HoldingContextOut:
+    market_value = position.shares * current_price
+    cost_basis = position.shares * position.avg_cost
+    unrealized_pnl = market_value - cost_basis
+    unrealized_pnl_pct = (
+        (current_price - position.avg_cost) / position.avg_cost * 100
+        if position.avg_cost > 0
+        else 0.0
+    )
+    return HoldingContextOut(
+        shares=position.shares,
+        avg_cost=position.avg_cost,
+        cost_basis=round(cost_basis, 2),
+        market_value=round(market_value, 2),
+        unrealized_pnl=round(unrealized_pnl, 2),
+        unrealized_pnl_pct=round(unrealized_pnl_pct, 2),
+        position_pct=_compute_position_pct(market_value, account_size),
+    )
+
+
+_PERSONALIZED_COMPARISON_RANK = {
+    "CONSIDER_BUY_NEW": 6,
+    "CONSIDER_ADDING": 6,
+    "HOLD": 5,
+    "HOLD_DO_NOT_ADD": 4,
+    "WAIT": 3,
+    "HOLD_WITH_TIGHT_RISK_CONTROL": 2,
+    "CONSIDER_REDUCING": 1,
+    "REDUCE_RISK": 1,
+    "AVOID_NEW": 0,
+    "REDUCE_OR_SELL": -1,
+}
+
+
+def _comparison_rank(result: AnalysisResponse) -> tuple:
+    personalized = result.personalized_risk
+    personal_rank = (
+        _PERSONALIZED_COMPARISON_RANK.get(personalized.action, 2)
+        if personalized
+        else {"buy": 3, "hold": 2, "sell": 0}.get(result.recommendation, 1)
+    )
+    recommendation_rank = {"buy": 2, "hold": 1, "sell": 0}.get(result.recommendation, 0)
+    plan_score = result.trading_plan.score if result.trading_plan else 0
+    return personal_rank, recommendation_rank, result.confidence or 0, plan_score
 
 
 def _run_analysis(
@@ -113,22 +173,25 @@ def _run_analysis(
     )
 
     personalized = None
-    if user and user.max_loss_tolerance_pct is not None and db is not None:
+    holding = None
+    pos = None
+    pnl_pct = None
+    avg_cost = None
+    position_pct = None
+
+    if user and db is not None:
         cleaned = symbol.upper()
         pos = db.query(Position).filter(
             Position.user_id == user.id,
             Position.symbol == cleaned,
         ).first()
-        pnl_pct = None
-        avg_cost = None
-        position_pct = None
         if pos:
-            avg_cost = pos.avg_cost
-            if pos.avg_cost > 0:
-                pnl_pct = round((current_price - pos.avg_cost) / pos.avg_cost * 100, 2)
-            mv = pos.shares * current_price
-            position_pct = _compute_position_pct(user, db, mv)
+            holding = _build_holding_context(pos, current_price, account_size)
+            avg_cost = holding.avg_cost
+            pnl_pct = holding.unrealized_pnl_pct
+            position_pct = holding.position_pct
 
+    if user and user.max_loss_tolerance_pct is not None and db is not None:
         pr = build_personalized_risk(
             analysis_score=recommendation.get("score", 0),
             analysis_action=recommendation["action"],
@@ -154,6 +217,7 @@ def _run_analysis(
         confidence=recommendation["confidence"],
         trading_plan=trading_plan,
         personalized_risk=personalized,
+        holding=holding,
     )
 
 
@@ -175,6 +239,17 @@ def get_quote(symbol: str = Query(...)):
     if not quote:
         raise HTTPException(status_code=404, detail=f"ไม่พบหุ้น '{symbol}'")
     return quote
+
+
+@protected.get("/api/stock/quotes", response_model=QuoteBatchResponse)
+def get_quotes(symbols: str = Query(..., description="สัญลักษณ์คั่นด้วยจุลภาค สูงสุด 30 ตัว")):
+    symbol_list = [symbol.strip() for symbol in symbols.split(",") if symbol.strip()]
+    if not symbol_list:
+        raise HTTPException(status_code=400, detail="ต้องระบุหุ้นอย่างน้อย 1 ตัว")
+    if len(symbol_list) > 30:
+        raise HTTPException(status_code=400, detail="ขอราคาได้สูงสุด 30 หุ้นต่อครั้ง")
+    quotes, errors = get_stock_quotes(symbol_list)
+    return QuoteBatchResponse(quotes=quotes, errors=errors)
 
 
 @protected.get("/api/stock/info", response_model=StockInfo)
@@ -257,6 +332,8 @@ def get_full_analysis(
         return _run_analysis(symbol, period, interval, acct, risk, user=user, db=db)
     except HTTPException:
         raise
+    except MarketDataError:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -289,16 +366,22 @@ def compare_stocks(
     valid = [r for r in results if r.recommendation != "error" and r.trading_plan]
     best = None
     if valid:
-        buys = [r for r in valid if r.recommendation == "buy"]
-        pool = buys if buys else valid
-        best = max(pool, key=lambda r: (r.confidence or 0, r.trading_plan.score if r.trading_plan else 0)).symbol
+        best = max(valid, key=_comparison_rank).symbol
 
     summary_parts = []
     for r in valid:
-        summary_parts.append(
-            f"{r.symbol}: {r.recommendation.upper()} ({(r.confidence or 0)*100:.0f}%) "
-            f"P/E={r.fundamental.pe_ratio or 'N/A'}"
-        )
+        if r.personalized_risk:
+            holding_note = ""
+            if r.holding:
+                holding_note = f", ในพอร์ต P/L {r.holding.unrealized_pnl_pct:+.1f}%"
+            summary_parts.append(
+                f"{r.symbol}: {r.personalized_risk.action_label}{holding_note}"
+            )
+        else:
+            summary_parts.append(
+                f"{r.symbol}: {r.recommendation.upper()} ({(r.confidence or 0)*100:.0f}%) "
+                f"P/E={r.fundamental.pe_ratio or 'N/A'}"
+            )
 
     return ComparisonResponse(
         symbols=symbol_list,

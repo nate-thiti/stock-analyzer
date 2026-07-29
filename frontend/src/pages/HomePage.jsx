@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Globe, ArrowUpRight, ArrowDownRight, TrendingUp } from 'lucide-react';
 import { api, POPULAR_STOCKS } from '../api';
-import { useQuotePoll, HOME_POLL_MS } from '../hooks/useQuotePoll';
+import { useBatchQuotes } from '../hooks/useBatchQuotes';
 import { useRiskProfile } from '../context/RiskProfileContext';
 import StarButton from '../components/StarButton';
 import MarketStateBadge from '../components/MarketStateBadge';
@@ -19,6 +19,8 @@ export default function HomePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { profile, needsSetup, save, load, loading: profileLoading } = useRiskProfile();
+  const popularSymbols = POPULAR_STOCKS.map((stock) => stock.symbol);
+  const { quotes: popularQuotes } = useBatchQuotes(popularSymbols);
 
   useEffect(() => {
     if (profile?.configured) {
@@ -104,7 +106,13 @@ export default function HomePage() {
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {POPULAR_STOCKS.map((s) => (
-            <StockCard key={s.symbol} symbol={s.symbol} name={s.name} market={s.market} />
+            <StockCard
+              key={s.symbol}
+              symbol={s.symbol}
+              name={s.name}
+              market={s.market}
+              quote={popularQuotes[s.symbol]}
+            />
           ))}
         </div>
       </section>
@@ -143,24 +151,7 @@ export default function HomePage() {
   );
 }
 
-function StockCard({ symbol, name, market }) {
-  const [quote, setQuote] = useState(null);
-
-  const refreshQuote = useCallback(async () => {
-    try {
-      const q = await api.quote(symbol);
-      setQuote(q);
-    } catch {
-      /* keep stale quote */
-    }
-  }, [symbol]);
-
-  useEffect(() => {
-    refreshQuote();
-  }, [refreshQuote]);
-
-  useQuotePoll(refreshQuote, { intervalMs: HOME_POLL_MS });
-
+function StockCard({ symbol, name, market, quote }) {
   const isUp = quote?.change >= 0;
 
   return (

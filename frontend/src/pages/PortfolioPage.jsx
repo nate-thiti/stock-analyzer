@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Briefcase, Plus, Trash2, Loader2, AlertTriangle, TrendingUp, TrendingDown, Pencil, BellRing,
@@ -7,6 +7,7 @@ import { api, formatNumber, formatMoney, formatSignedMoney, formatSignedPct, for
 import { useQuotePoll } from '../hooks/useQuotePoll';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import PortfolioDashboard from '../components/PortfolioDashboard';
+import PortfolioIntelligence from '../components/PortfolioIntelligence';
 import PriceAlertButton, { AlertTriggeredBadge } from '../components/PriceAlertButton';
 
 export default function PortfolioPage() {
@@ -17,6 +18,9 @@ export default function PortfolioPage() {
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState({ shares: '', avg_cost: '' });
+  const [intelligence, setIntelligence] = useState(null);
+  const [intelligenceLoading, setIntelligenceLoading] = useState(true);
+  const [intelligenceError, setIntelligenceError] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -31,8 +35,22 @@ export default function PortfolioPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
   useQuotePoll(load, { enabled: true });
+
+  const loadIntelligence = useCallback(async () => {
+    setIntelligenceLoading(true);
+    try {
+      const result = await api.portfolioIntelligence('6mo');
+      setIntelligence(result);
+      setIntelligenceError(null);
+    } catch (err) {
+      setIntelligenceError(err.message);
+    } finally {
+      setIntelligenceLoading(false);
+    }
+  }, []);
+
+  useQuotePoll(loadIntelligence, { enabled: positions.length > 0, intervalMs: 15 * 60_000 });
   const { alerts, load: reloadAlerts, triggered } = usePriceAlerts();
 
   const handleCreate = async (e) => {
@@ -47,6 +65,7 @@ export default function PortfolioPage() {
       });
       setForm({ symbol: '', shares: '', avg_cost: '' });
       await load();
+      await loadIntelligence();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -64,6 +83,7 @@ export default function PortfolioPage() {
       });
       setEditId(null);
       await load();
+      await loadIntelligence();
     } catch (err) {
       setError(err.message);
     }
@@ -74,6 +94,7 @@ export default function PortfolioPage() {
     try {
       await api.deletePosition(id);
       await load();
+      await loadIntelligence();
     } catch (err) {
       setError(err.message);
     }
@@ -129,6 +150,14 @@ export default function PortfolioPage() {
             />
           </div>
           <PortfolioDashboard positions={positions} totalValue={totalValue} portfolioCurrency={portfolioCurrency} />
+          <PortfolioIntelligence
+            data={intelligence}
+            loading={intelligenceLoading}
+            error={intelligenceError}
+            positions={positions}
+            onRefresh={loadIntelligence}
+            onSimulate={(payload) => api.simulatePortfolio(payload, '6mo')}
+          />
         </>
       )}
 

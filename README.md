@@ -458,16 +458,17 @@ docker compose up -d   # restart backend — ไม่ต้อง rebuild front
 | `day_open`, `day_high`, `day_low` | เปิด/สูง/ต่ำของวัน (ตอนตลาดเปิด) |
 | `market_time`, `market_state`, `exchange_timezone` | เวลาและสถานะตลาด |
 
-### Backend cache (TTL **1 นาที**)
+### Backend cache
 
 | ประเภท | TTL |
 |--------|-----|
-| Quote | 1 นาที |
-| History | 1 นาที |
-| Raw financials | 1 นาที |
-| Market signals | 1 นาที |
+| Quote | 5 นาที |
+| History | 10 นาที |
+| Raw financials | 15 นาที |
+| Earnings/dividend events | 6 ชั่วโมง |
+| Market signals | 15 นาที |
 
-> ข้อมูล Yahoo ต้นทางอาจดีเลย์ 5–15 นาที — refresh บ่อยขึ้นไม่ได้ทำให้ real-time
+> หาก Yahoo Finance ตอบช้าหรือ rate-limit ระบบใช้ cache เดิมที่อายุไม่เกิน 1 ชั่วโมง ข้อมูลต้นทางอาจดีเลย์ 5–15 นาที — refresh บ่อยขึ้นไม่ได้ทำให้ real-time
 
 ### ดูล่าสุด (localStorage)
 

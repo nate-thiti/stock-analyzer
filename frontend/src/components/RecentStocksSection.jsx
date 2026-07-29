@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { History, ArrowUpRight, ArrowDownRight, X } from 'lucide-react';
-import { api } from '../api';
 import { getRecentStocks, removeRecentStock } from '../utils/recentStocks';
-import { useQuotePoll, HOME_POLL_MS } from '../hooks/useQuotePoll';
+import { useBatchQuotes } from '../hooks/useBatchQuotes';
 import MarketStateBadge from './MarketStateBadge';
 
 export default function RecentStocksSection() {
   const [symbols, setSymbols] = useState(getRecentStocks());
+  const { quotes } = useBatchQuotes(symbols);
 
   useEffect(() => {
     const refresh = () => setSymbols(getRecentStocks());
@@ -33,26 +33,19 @@ export default function RecentStocksSection() {
       </h3>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {symbols.map((sym) => (
-          <RecentChip key={sym} symbol={sym} onRemove={() => handleRemove(sym)} />
+          <RecentChip
+            key={sym}
+            symbol={sym}
+            quote={quotes[sym]}
+            onRemove={() => handleRemove(sym)}
+          />
         ))}
       </div>
     </section>
   );
 }
 
-function RecentChip({ symbol, onRemove }) {
-  const [quote, setQuote] = useState(null);
-
-  const refreshQuote = useCallback(async () => {
-    try {
-      const q = await api.quote(symbol);
-      setQuote(q);
-    } catch { /* ignore */ }
-  }, [symbol]);
-
-  useEffect(() => { refreshQuote(); }, [refreshQuote]);
-  useQuotePoll(refreshQuote, { intervalMs: HOME_POLL_MS });
-
+function RecentChip({ symbol, quote, onRemove }) {
   const isUp = quote?.change >= 0;
 
   return (

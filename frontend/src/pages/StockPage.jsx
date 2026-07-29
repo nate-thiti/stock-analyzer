@@ -86,7 +86,7 @@ export default function StockPage() {
     }
   }, [symbol]);
 
-  useQuotePoll(refreshQuote, { enabled: !!symbol });
+  useQuotePoll(refreshQuote, { enabled: !!symbol, immediate: false });
 
   const refreshHistory = useCallback(async () => {
     if (!symbol) return;
@@ -98,7 +98,11 @@ export default function StockPage() {
     }
   }, [symbol, period, candleInterval]);
 
-  useQuotePoll(refreshHistory, { enabled: !!symbol, intervalMs: ANALYSIS_POLL_MS });
+  useQuotePoll(refreshHistory, {
+    enabled: !!symbol,
+    intervalMs: ANALYSIS_POLL_MS,
+    immediate: false,
+  });
 
   const refreshAnalysis = useCallback(async () => {
     if (!symbol) return;
@@ -110,7 +114,11 @@ export default function StockPage() {
     }
   }, [symbol, period, candleInterval]);
 
-  useQuotePoll(refreshAnalysis, { enabled: !!symbol, intervalMs: ANALYSIS_POLL_MS });
+  useQuotePoll(refreshAnalysis, {
+    enabled: !!symbol,
+    intervalMs: ANALYSIS_POLL_MS,
+    immediate: false,
+  });
 
   // โหลดราคา + กราฟก่อน (เร็ว)
   useEffect(() => {
@@ -196,6 +204,10 @@ export default function StockPage() {
 
   return (
     <div className="space-y-6 w-full min-w-0">
+      <div className="flex items-start gap-2 rounded-xl border border-warning/20 bg-warning/5 px-3 py-2 text-xs text-muted">
+        <Clock size={14} className="mt-0.5 shrink-0 text-warning" />
+        <span>ราคาจาก Yahoo Finance อาจล่าช้า ไม่ใช่ข้อมูลเรียลไทม์ และระบบใช้ราคาแคชประมาณ 5 นาที</span>
+      </div>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <Link to="/" className="text-xs text-muted hover:text-primary transition-colors">← หน้าแรก</Link>
         <Link

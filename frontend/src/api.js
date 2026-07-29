@@ -66,6 +66,13 @@ export const api = {
   removeFavorite: (symbol) => fetchJSON(`/favorites/${encodeURIComponent(symbol)}`, { method: 'DELETE' }),
 
   listPositions: () => fetchJSON('/positions'),
+  portfolioIntelligence: (period = '6mo') =>
+    fetchJSON(`/portfolio/intelligence?period=${encodeURIComponent(period)}`),
+  simulatePortfolio: (data, period = '6mo') =>
+    fetchJSON(`/portfolio/simulate?period=${encodeURIComponent(period)}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   createPosition: (data) => fetchJSON('/positions', { method: 'POST', body: JSON.stringify(data) }),
   updatePosition: (id, data) => fetchJSON(`/positions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deletePosition: (id) => fetchJSON(`/positions/${id}`, { method: 'DELETE' }),
@@ -78,6 +85,8 @@ export const api = {
   setWatchlist: (symbols) => fetchJSON('/watchlist', { method: 'PUT', body: JSON.stringify({ symbols }) }),
 
   quote: (symbol) => fetchJSON(`/stock/quote?symbol=${encodeURIComponent(symbol)}`),
+  quotes: (symbols) =>
+    fetchJSON(`/stock/quotes?symbols=${encodeURIComponent(symbols.join(','))}`),
   info: (symbol) => fetchJSON(`/stock/info?symbol=${encodeURIComponent(symbol)}`),
   history: (symbol, period, interval) =>
     fetchJSON(`/stock/history?symbol=${encodeURIComponent(symbol)}&period=${period}&interval=${interval}`),
@@ -87,11 +96,12 @@ export const api = {
       `/analysis/full?symbol=${encodeURIComponent(symbol)}&period=${period}&interval=${interval}` +
       `&account_size=${accountSize}&risk_pct=${riskPct}`
     ),
-  compare: (symbols, period, interval, accountSize = DEFAULT_ACCOUNT_SIZE, riskPct = DEFAULT_RISK_PCT) =>
-    fetchJSON(
-      `/analysis/compare?symbols=${encodeURIComponent(symbols)}&period=${period}&interval=${interval}` +
-      `&account_size=${accountSize}&risk_pct=${riskPct}`
-    ),
+  compare: (symbols, period = '6mo', interval = '1d', accountSize, riskPct) => {
+    const params = new URLSearchParams({ symbols, period, interval });
+    if (accountSize != null) params.set('account_size', accountSize);
+    if (riskPct != null) params.set('risk_pct', riskPct);
+    return fetchJSON(`/analysis/compare?${params.toString()}`);
+  },
   quarterlyFundamentals: (symbol) =>
     fetchJSON(`/stock/fundamentals/quarterly?symbol=${encodeURIComponent(symbol)}`),
   peHistory: (symbol, period = '2y') =>

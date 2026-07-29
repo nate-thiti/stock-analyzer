@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from .services import PERIOD_MAP, _get_ticker, get_raw_financials, clean_symbol
+from .services import PERIOD_MAP, get_provider_history, get_raw_financials, clean_symbol
 
 
 def _parse_date(value: str) -> datetime:
@@ -89,9 +89,7 @@ def _lookup_ttm_eps(as_of: datetime, schedule: List[Tuple[datetime, float]]) -> 
 def build_pe_history(symbol: str, period: str = "2y") -> List[Dict[str, Any]]:
     cleaned = clean_symbol(symbol)
     yf_period = PERIOD_MAP.get(period, "2y")
-    ticker = _get_ticker(cleaned)
-
-    df = ticker.history(period=yf_period, interval="1d")
+    df = get_provider_history(cleaned, period=yf_period, interval="1d")
     if df is None or df.empty:
         return []
 

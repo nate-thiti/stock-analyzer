@@ -5,8 +5,9 @@ const HOME_POLL_MS = 60_000;
 const SIGNALS_POLL_MS = 60_000;
 const ANALYSIS_POLL_MS = 60_000;
 
-export function useQuotePoll(fetchQuote, { enabled = true, intervalMs = POLL_MS } = {}) {
+export function useQuotePoll(fetchQuote, { enabled = true, intervalMs = POLL_MS, immediate = true } = {}) {
   const fetchRef = useRef(fetchQuote);
+  const inFlightRef = useRef(false);
   fetchRef.current = fetchQuote;
 
   useEffect(() => {
@@ -16,12 +17,15 @@ export function useQuotePoll(fetchQuote, { enabled = true, intervalMs = POLL_MS 
     let backoffMs = intervalMs;
 
     const tick = async () => {
-      if (document.hidden) return;
+      if (document.hidden || inFlightRef.current) return;
+      inFlightRef.current = true;
       try {
         await fetchRef.current();
         backoffMs = intervalMs;
       } catch {
         backoffMs = Math.min(backoffMs * 2, intervalMs * 8);
+      } finally {
+        inFlightRef.current = false;
       }
     };
 
@@ -39,7 +43,7 @@ export function useQuotePoll(fetchQuote, { enabled = true, intervalMs = POLL_MS 
       }
     };
 
-    tick();
+    if (immediate) tick();
     document.addEventListener('visibilitychange', onVisibility);
     schedule();
 
@@ -47,7 +51,7 @@ export function useQuotePoll(fetchQuote, { enabled = true, intervalMs = POLL_MS 
       clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [enabled, intervalMs]);
+  }, [enabled, intervalMs, immediate]);
 }
 
 export { POLL_MS, HOME_POLL_MS, SIGNALS_POLL_MS, ANALYSIS_POLL_MS };

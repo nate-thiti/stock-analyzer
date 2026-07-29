@@ -1,6 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { TrendingUp, Activity, TrendingDown, Loader2, RefreshCw, ArrowUpRight, ArrowDownRight, Star, Globe } from 'lucide-react';
+import {
+  TrendingUp, Activity, TrendingDown, Loader2, RefreshCw, ArrowUpRight,
+  ArrowDownRight, Star, Globe, Briefcase, CirclePlus,
+} from 'lucide-react';
 import { api, ACTION_STYLES } from '../api';
 import { useQuotePoll, SIGNALS_POLL_MS } from '../hooks/useQuotePoll';
 import StarButton from './StarButton';
@@ -37,7 +40,7 @@ export default function MarketSignalSections() {
 
   const load = useCallback(async (refresh = false, scopeOverride = scope) => {
     if (refresh) setRefreshing(true);
-    else if (!data) setLoading(true);
+    else setLoading(true);
     setError(null);
     try {
       const res = await api.marketSignals(refresh, scopeOverride);
@@ -55,7 +58,10 @@ export default function MarketSignalSections() {
     load(false, scope);
   }, [scope]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useQuotePoll(() => load(false, scope), { enabled: true, intervalMs: SIGNALS_POLL_MS });
+  useQuotePoll(
+    () => load(false, scope),
+    { enabled: true, intervalMs: SIGNALS_POLL_MS, immediate: false },
+  );
 
   if (loading && !data) {
     return (
@@ -71,6 +77,15 @@ export default function MarketSignalSections() {
       <div className="glass-card rounded-2xl p-6 text-center">
         <p className="text-sm text-danger">{error}</p>
         <button type="button" onClick={() => load()} className="mt-3 text-xs text-primary hover:underline">ลองใหม่</button>
+      </div>
+    );
+  }
+
+  if (data?.refreshing && !data.updated_at) {
+    return (
+      <div className="glass-card rounded-2xl p-8 flex flex-col items-center gap-3 text-muted">
+        <Loader2 size={28} className="animate-spin text-primary" />
+        <p className="text-sm">เริ่มอัปเดตสัญญาณในเบื้องหลังแล้ว หน้านี้จะตรวจผลให้อัตโนมัติ</p>
       </div>
     );
   }
@@ -91,17 +106,20 @@ export default function MarketSignalSections() {
           />
           <p className="text-sm text-muted shrink-0">
             สแกน {data?.scanned} ตัว
+            <span className="ml-1">• ในพอร์ต {data?.portfolio_scanned || 0}</span>
+            <span className="ml-1">• ยังไม่ได้ถือ {data?.candidates_scanned || 0}</span>
             {data?.updated_at && <span> • อัปเดต {formatUpdated(data.updated_at)}</span>}
+            {data?.refreshing && <span className="text-warning ml-1">• กำลังอัปเดตเบื้องหลัง</span>}
             <span className="text-primary/70 ml-1">• auto 15m</span>
           </p>
         </div>
         <button
           type="button"
           onClick={() => load(true)}
-          disabled={refreshing}
+          disabled={refreshing || data?.refreshing}
           className="flex items-center gap-1.5 text-sm text-primary hover:underline disabled:opacity-50"
         >
-          <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+          <RefreshCw size={12} className={(refreshing || data?.refreshing) ? 'animate-spin' : ''} />
           รีเฟรช
         </button>
       </div>
@@ -123,7 +141,7 @@ export default function MarketSignalSections() {
             </h3>
             {items.length === 0 ? (
               <div className={`rounded-2xl border ${border} ${bg} p-5 text-center text-xs text-muted`}>
-                ไม่มีหุ้นในกลุ่มนี้จาก watchlist วันนี้
+                ไม่มีหุ้นในกลุ่มนี้จากพอร์ตและรายการติดตามวันนี้
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -158,8 +176,29 @@ function SignalCard({ item }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-bold text-foreground group-hover:text-primary transition-colors truncate">{item.name || item.symbol}</p>
-        <p className="text-xs font-mono text-muted">{item.symbol}</p>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p className="text-xs font-mono text-muted">{item.symbol}</p>
+          {item.has_position ? (
+            <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-1.5 py-0.5 text-xs font-bold text-primary">
+              <Briefcase size={9} /> ในพอร์ต
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-md bg-success/5 border border-success/20 px-1.5 py-0.5 text-xs text-success">
+              <CirclePlus size={9} /> ยังไม่ได้ถือ
+            </span>
+          )}
+        </div>
         <p className="text-xs text-muted mt-1">Score {item.score >= 0 ? '+' : ''}{item.score?.toFixed(2)}</p>
+        {item.personalized_action_label && (
+          <p className={`text-xs font-bold mt-1 ${
+            item.personalized_action?.includes('REDUCE') ? 'text-danger'
+              : item.personalized_action?.includes('BUY') || item.personalized_action?.includes('ADDING')
+                ? 'text-success' : 'text-warning'
+          }`}>
+            สำหรับคุณ: {item.personalized_action_label}
+            {item.unrealized_pnl_pct != null && ` • P/L ${item.unrealized_pnl_pct >= 0 ? '+' : ''}${item.unrealized_pnl_pct.toFixed(1)}%`}
+          </p>
+        )}
       </div>
       <div className="flex items-end justify-between mt-2 gap-2">
         <div>

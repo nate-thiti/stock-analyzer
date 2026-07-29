@@ -23,6 +23,12 @@ class StockQuote(BaseModel):
     day_high: Optional[float] = None
     day_low: Optional[float] = None
 
+
+class QuoteBatchResponse(BaseModel):
+    quotes: Dict[str, StockQuote] = {}
+    errors: Dict[str, str] = {}
+
+
 class StockHistoryItem(BaseModel):
     time: str
     open: float
@@ -160,6 +166,16 @@ class PersonalizedRiskOut(BaseModel):
     notes: List[str] = []
 
 
+class HoldingContextOut(BaseModel):
+    shares: float
+    avg_cost: float
+    cost_basis: float
+    market_value: float
+    unrealized_pnl: float
+    unrealized_pnl_pct: float
+    position_pct: Optional[float] = None
+
+
 class AnalysisResponse(BaseModel):
     symbol: str
     current_price: Optional[float] = None
@@ -171,6 +187,7 @@ class AnalysisResponse(BaseModel):
     confidence: Optional[float] = None
     trading_plan: Optional[TradingPlan] = None
     personalized_risk: Optional[PersonalizedRiskOut] = None
+    holding: Optional[HoldingContextOut] = None
 
 class ComparisonResponse(BaseModel):
     symbols: List[str]
@@ -190,6 +207,11 @@ class SignalItem(BaseModel):
     score: float = 0
     signal_tier: str = "hold"
     signal_tier_label: str = "ถือ/รอดู"
+    has_position: bool = False
+    personalized_action: Optional[str] = None
+    personalized_action_label: Optional[str] = None
+    unrealized_pnl_pct: Optional[float] = None
+    position_pct: Optional[float] = None
 
 
 class MarketSignalsResponse(BaseModel):
@@ -201,6 +223,9 @@ class MarketSignalsResponse(BaseModel):
     scanned: int = 0
     updated_at: str = ""
     scope_used: str = "global"
+    refreshing: bool = False
+    portfolio_scanned: int = 0
+    candidates_scanned: int = 0
 
 
 class CSVImportRequest(BaseModel):

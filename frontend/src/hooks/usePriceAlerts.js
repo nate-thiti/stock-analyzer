@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { api } from '../api';
 import { useQuotePoll } from './useQuotePoll';
 import { handleTriggeredAlerts } from '../utils/alertSound';
@@ -20,7 +20,6 @@ export function usePriceAlerts({ enabled = true, poll = true } = {}) {
     }
   }, [enabled]);
 
-  useEffect(() => { load(); }, [load]);
   useQuotePoll(load, { enabled: enabled && poll });
 
   const triggered = alerts.filter((a) => a.triggered);
