@@ -1,6 +1,8 @@
 import asyncio
 import time
 
+import pandas as pd
+
 from app import services
 from app.main import market_data_error_handler
 from app.schemas import StockQuote
@@ -31,6 +33,34 @@ def test_quote_uses_stale_cache_when_provider_is_rate_limited(monkeypatch):
 
     monkeypatch.setattr(services, "_provider_call", rate_limited)
     assert services.get_stock_quote("AAPL").price == 100
+
+
+def test_batch_quotes_use_one_provider_call_and_share_five_minute_cache(monkeypatch):
+    services.quote_cache.clear()
+    index = pd.to_datetime(["2026-08-03", "2026-08-04"])
+    columns = pd.MultiIndex.from_product([
+        ["AAPL", "MSFT"], ["Open", "High", "Low", "Close", "Volume"],
+    ])
+    frame = pd.DataFrame(index=index, columns=columns, dtype=float)
+    frame.loc[index[0], "AAPL"] = [99, 102, 98, 100, 1_000]
+    frame.loc[index[1], "AAPL"] = [100, 104, 99, 103, 1_200]
+    frame.loc[index[0], "MSFT"] = [198, 202, 197, 200, 900]
+    frame.loc[index[1], "MSFT"] = [200, 203, 199, 202, 950]
+    calls = []
+
+    def provider(label, _operation):
+        calls.append(label)
+        return frame
+
+    monkeypatch.setattr(services, "_provider_call", provider)
+
+    first, errors = services.get_stock_quotes(["AAPL", "MSFT"])
+    second, second_errors = services.get_stock_quotes(["MSFT", "AAPL"])
+
+    assert errors == second_errors == {}
+    assert first["AAPL"].price == second["AAPL"].price == 103
+    assert first["MSFT"].change_percent == 1.0
+    assert len(calls) == 1
 
 
 def test_quote_rate_limit_is_http_429():

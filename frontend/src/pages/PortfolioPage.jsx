@@ -10,6 +10,7 @@ import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import PortfolioDashboard from '../components/PortfolioDashboard';
 import PortfolioIntelligence from '../components/PortfolioIntelligence';
 import PriceAlertButton, { AlertTriggeredBadge } from '../components/PriceAlertButton';
+import DataFreshnessNotice from '../components/DataFreshnessNotice';
 
 export default function PortfolioPage() {
   const [savedPositions, setSavedPositions] = useState([]);
@@ -49,15 +50,23 @@ export default function PortfolioPage() {
     errors: quoteErrors,
     loading: quotesLoading,
   } = useBatchQuotes(symbols, { enabled: !loading });
+  const intelligenceBySymbol = useMemo(
+    () => Object.fromEntries(
+      (intelligence?.positions || []).map((position) => [position.symbol, position]),
+    ),
+    [intelligence],
+  );
   const positions = useMemo(() => savedPositions.map((position) => {
     const quote = quotes[position.symbol];
+    const marketProfile = intelligenceBySymbol[position.symbol];
     const currentPrice = quote?.price ?? null;
     const costBasis = position.shares * position.avg_cost;
     const marketValue = currentPrice == null ? null : position.shares * currentPrice;
     const pnl = marketValue == null ? null : marketValue - costBasis;
     return {
       ...position,
-      name: quote?.name || position.name || position.symbol,
+      name: marketProfile?.name || quote?.name || position.name || position.symbol,
+      sector: marketProfile?.sector || position.sector || null,
       current_price: currentPrice,
       currency: quote?.currency || position.currency || inferCurrency(position.symbol),
       cost_basis: costBasis,
@@ -65,7 +74,7 @@ export default function PortfolioPage() {
       unrealized_pnl: pnl,
       unrealized_pnl_pct: pnl == null || !costBasis ? null : (pnl / costBasis) * 100,
     };
-  }), [savedPositions, quotes]);
+  }), [savedPositions, quotes, intelligenceBySymbol]);
   const unavailableQuoteCount = Object.keys(quoteErrors).length;
 
   const loadIntelligence = useCallback(async () => {
@@ -147,8 +156,10 @@ export default function PortfolioPage() {
           <Briefcase size={24} className="text-primary" />
           พอร์ตของฉัน
         </h2>
-        <p className="text-sm text-muted mt-1">บันทึกหุ้นที่ถือ + ราคาซื้อเฉลี่ย — ราคาอัปเดต auto 30s</p>
+        <p className="text-sm text-muted mt-1">บันทึกหุ้นที่ถือ + ราคาซื้อเฉลี่ย — ราคา Yahoo อัปเดตเป็น batch ทุก 5 นาที</p>
       </div>
+
+      <DataFreshnessNotice />
 
       {error && (
         <div className="bg-danger/5 border border-danger/25 rounded-2xl p-4 flex items-center gap-3">
@@ -193,7 +204,13 @@ export default function PortfolioPage() {
               positive={totalPnlPct == null ? undefined : totalPnlPct >= 0}
             />
           </div>
-          <PortfolioDashboard positions={positions} totalValue={totalValue} portfolioCurrency={portfolioCurrency} />
+          <PortfolioDashboard
+            positions={positions}
+            totalValue={totalValue}
+            portfolioCurrency={portfolioCurrency}
+            sectorLoading={intelligenceLoading && !intelligence}
+            sectorError={intelligenceError && !intelligence ? intelligenceError : null}
+          />
           <PortfolioIntelligence
             data={intelligence}
             loading={intelligenceLoading}

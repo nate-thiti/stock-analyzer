@@ -8,7 +8,7 @@ from ..database import get_db
 from ..models import User, PriceAlert
 from ..auth import get_current_user
 from ..auth_schemas import PriceAlertOut, PriceAlertCreate
-from ..services import get_stock_quote
+from ..services import get_stock_quote, get_stock_quotes
 
 router = APIRouter(prefix="/api/price-alerts", tags=["price-alerts"])
 
@@ -49,11 +49,12 @@ def list_alerts(user: User = Depends(get_current_user), db: Session = Depends(ge
         .order_by(PriceAlert.symbol, PriceAlert.created_at.desc())
         .all()
     )
+    quotes, _errors = get_stock_quotes([alert.symbol for alert in alerts])
     result = []
     now = datetime.now(timezone.utc)
     dirty = False
     for alert in alerts:
-        quote = get_stock_quote(alert.symbol)
+        quote = quotes.get(alert.symbol)
         current = quote.price if quote else None
         if _is_triggered(current, alert.target_price, alert.direction) and alert.triggered_at is None:
             alert.triggered_at = now

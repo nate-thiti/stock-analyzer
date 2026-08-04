@@ -10,6 +10,7 @@ import MarketSignalSections from '../components/MarketSignalSections';
 import QuickCompareSection from '../components/QuickCompareSection';
 import RecentStocksSection from '../components/RecentStocksSection';
 import RiskProfileModal from '../components/RiskProfileModal';
+import DataFreshnessNotice from '../components/DataFreshnessNotice';
 
 export default function HomePage() {
   const [query, setQuery] = useState('');
@@ -97,6 +98,8 @@ export default function HomePage() {
           </div>
         )}
       </section>
+
+      <DataFreshnessNotice />
 
       <RecentStocksSection />
 

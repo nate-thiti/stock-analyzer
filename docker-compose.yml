@@ -4,6 +4,10 @@ services:
     ports:
       - "8010:8010"
     restart: always
+    # Yahoo Finance ใช้หลาย host; ระบุ fallback ป้องกัน Docker DNS resolver สะดุด
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     env_file:
       - path: .env
         required: false

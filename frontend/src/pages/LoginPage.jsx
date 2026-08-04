@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { LogIn, AlertTriangle } from 'lucide-react';
+import { LogIn, AlertTriangle, LockKeyhole, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import PasswordInput from '../components/PasswordInput';
 import AuthPageLayout from '../components/auth/AuthPageLayout';
@@ -38,11 +38,14 @@ export default function LoginPage() {
       title="เข้าสู่ระบบ"
       subtitle="ยินดีต้อนรับกลับ"
       icon={LogIn}
-      tagline="วิเคราะห์หุ้นอย่างเรียบง่าย"
+      tagline="ปลุก Market Intelligence ให้ทำงาน"
+      description="แกนวิเคราะห์อัจฉริยะเชื่อมราคา แนวโน้ม ความเสี่ยง และพอร์ตของคุณไว้ในมุมมองเดียว"
+      helperText="เข้าสู่ระบบเพื่อดูบทวิเคราะห์ พอร์ต และการแจ้งเตือนล่าสุด"
+      sceneVariant="core"
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
-          <div className="bg-danger/5 border border-danger/25 rounded-xl p-3 flex items-center gap-2 text-sm text-danger">
+          <div className="bg-danger/5 border border-danger/25 rounded-xl p-3 flex items-center gap-2 text-sm text-danger" role="alert" aria-live="polite">
             <AlertTriangle size={16} className="shrink-0" />
             {error}
           </div>
@@ -50,22 +53,28 @@ export default function LoginPage() {
 
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-bold text-muted uppercase">อีเมล</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              className="w-full mt-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary"
-              placeholder="you@example.com"
-            />
+            <label htmlFor="login-email" className="text-xs font-bold text-muted">อีเมล</label>
+            <div className="relative mt-1.5">
+              <Mail size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+              <input
+                id="login-email"
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                required
+                autoComplete="email"
+                className="auth-input w-full pl-11"
+                placeholder="you@example.com"
+              />
+            </div>
           </div>
           <div>
-            <label className="text-xs font-bold text-muted uppercase">รหัสผ่าน</label>
+            <label htmlFor="login-password" className="text-xs font-bold text-muted">รหัสผ่าน</label>
             <PasswordInput
+              id="login-password"
+              leadingIcon={LockKeyhole}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); setError(null); }}
               required
               autoComplete="current-password"
               placeholder="••••••••"
@@ -76,7 +85,8 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 bg-gradient-primary border border-primary rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+          aria-busy={loading}
+          className="auth-submit btn-glow w-full flex items-center justify-center gap-2"
         >
           {loading ? 'กำลังเข้าสู่ระบบ...' : (
             <>

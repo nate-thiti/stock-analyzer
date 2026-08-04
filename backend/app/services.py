@@ -1,6 +1,6 @@
 import yfinance as yf
 import pandas as pd
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError, as_completed
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import os
@@ -12,15 +12,14 @@ from .fundamentals import RawFinancials, compute_fundamentals
 from .market_hours import infer_market_state, merge_yahoo_info, pick_info_str
 
 QUOTE_CACHE_EXPIRY = int(os.getenv("QUOTE_CACHE_SECONDS", "300"))
-HISTORY_CACHE_EXPIRY = int(os.getenv("HISTORY_CACHE_SECONDS", "600"))
-RAW_CACHE_EXPIRY = int(os.getenv("RAW_CACHE_SECONDS", "21600"))
-EVENT_CACHE_EXPIRY = int(os.getenv("EVENT_CACHE_SECONDS", "21600"))
+HISTORY_CACHE_EXPIRY = int(os.getenv("HISTORY_CACHE_SECONDS", "300"))
+RAW_CACHE_EXPIRY = int(os.getenv("RAW_CACHE_SECONDS", "86400"))
+EVENT_CACHE_EXPIRY = int(os.getenv("EVENT_CACHE_SECONDS", "86400"))
 STALE_CACHE_EXPIRY = int(os.getenv("STALE_CACHE_SECONDS", "3600"))
 RAW_STALE_CACHE_EXPIRY = int(os.getenv("RAW_STALE_CACHE_SECONDS", "86400"))
 YAHOO_TIMEOUT_SECONDS = float(os.getenv("YAHOO_TIMEOUT_SECONDS", "12"))
 YAHOO_MAX_WORKERS = int(os.getenv("YAHOO_MAX_WORKERS", "6"))
 _provider_pool = ThreadPoolExecutor(max_workers=YAHOO_MAX_WORKERS, thread_name_prefix="yahoo")
-_batch_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="quote-batch")
 T = TypeVar("T")
 
 
@@ -107,6 +106,7 @@ _inflight_raw: Dict[str, threading.Event] = {}
 _inflight_quote: Dict[str, threading.Event] = {}
 _inflight_history: Dict[str, threading.Event] = {}
 _inflight_lock = threading.Lock()
+_batch_quote_lock = threading.Lock()
 
 PERIOD_MAP = {
     "1d": "1d", "5d": "5d", "1mo": "1mo", "3mo": "3mo",
@@ -621,8 +621,11 @@ def _fetch_stock_quote(cleaned: str) -> Optional[StockQuote]:
 
 def get_stock_quote(symbol: str) -> Optional[StockQuote]:
     cleaned = clean_symbol(symbol)
+    entry = quote_cache.get(cleaned)
     cached = _cached(quote_cache, cleaned, QUOTE_CACHE_EXPIRY)
-    if cached is not None:
+    # Batch rows deliberately contain only market fields. A detail page upgrades
+    # that row once per cache window to include Yahoo profile/session metadata.
+    if cached is not None and (entry or {}).get("detail", True):
         return cached
 
     event, is_owner = _claim_inflight(_inflight_quote, cleaned)
@@ -637,7 +640,7 @@ def get_stock_quote(symbol: str) -> Optional[StockQuote]:
         try:
             quote = _provider_call(f"quote:{cleaned}", lambda: _fetch_stock_quote(cleaned))
             if quote is not None:
-                quote_cache[cleaned] = {"timestamp": time.time(), "data": quote}
+                quote_cache[cleaned] = {"timestamp": time.time(), "data": quote, "detail": True}
             return quote
         except MarketDataError as error:
             stale = _stale(quote_cache, cleaned)
@@ -650,22 +653,126 @@ def get_stock_quote(symbol: str) -> Optional[StockQuote]:
         _release_inflight(_inflight_quote, cleaned, event)
 
 
-def get_stock_quotes(symbols: List[str]) -> tuple[Dict[str, StockQuote], Dict[str, str]]:
+def _get_stock_quotes_unlocked(symbols: List[str]) -> tuple[Dict[str, StockQuote], Dict[str, str]]:
     cleaned = list(dict.fromkeys(clean_symbol(symbol) for symbol in symbols if symbol.strip()))
     quotes: Dict[str, StockQuote] = {}
     errors: Dict[str, str] = {}
-    futures = {_batch_pool.submit(get_stock_quote, symbol): symbol for symbol in cleaned}
-    for future in as_completed(futures):
-        symbol = futures[future]
-        try:
-            quote = future.result()
-            if quote is not None:
+
+    # Serve everything still inside the shared five-minute window immediately.
+    missing = []
+    for symbol in cleaned:
+        cached = _cached(quote_cache, symbol, QUOTE_CACHE_EXPIRY)
+        if cached is not None:
+            quotes[symbol] = cached
+        else:
+            missing.append(symbol)
+
+    if not missing:
+        return quotes, errors
+
+    def fetch_batch():
+        return yf.download(
+            tickers=missing,
+            period="5d",
+            interval="1d",
+            group_by="ticker",
+            auto_adjust=False,
+            actions=False,
+            threads=True,
+            progress=False,
+            timeout=YAHOO_TIMEOUT_SECONDS,
+        )
+
+    try:
+        frame = _provider_call(f"quotes-batch:{','.join(missing)}", fetch_batch)
+        fetched_at = datetime.now(timezone.utc)
+
+        for symbol in missing:
+            try:
+                if frame is None or frame.empty:
+                    continue
+                if isinstance(frame.columns, pd.MultiIndex):
+                    if symbol in frame.columns.get_level_values(0):
+                        symbol_frame = frame[symbol]
+                    elif symbol in frame.columns.get_level_values(1):
+                        symbol_frame = frame.xs(symbol, axis=1, level=1)
+                    else:
+                        continue
+                else:
+                    # yfinance returns flat columns when the batch contains one ticker.
+                    symbol_frame = frame
+
+                symbol_frame = symbol_frame.dropna(subset=["Close"])
+                if symbol_frame.empty:
+                    continue
+
+                latest = symbol_frame.iloc[-1]
+                price = _optional_quote_float(latest.get("Close"))
+                if price is None:
+                    continue
+                previous = (
+                    _optional_quote_float(symbol_frame.iloc[-2].get("Close"))
+                    if len(symbol_frame) > 1 else price
+                ) or price
+                change = round(price - previous, 2)
+                change_percent = round(change / previous * 100, 2) if previous else 0.0
+                stale = _stale(quote_cache, symbol)
+                timezone_name = stale.exchange_timezone if stale else None
+                market_state = infer_market_state(symbol, timezone_name)
+                market_time = _format_history_time(symbol_frame.index[-1], "1d", timezone_name)
+                currency = stale.currency if stale else (
+                    "THB" if symbol.endswith(".BK") else "HKD" if symbol.endswith(".HK") else "USD"
+                )
+                quote = StockQuote(
+                    symbol=symbol,
+                    name=(stale.name if stale else None) or symbol,
+                    price=price,
+                    change=change,
+                    change_percent=change_percent,
+                    currency=currency,
+                    exchange=(stale.exchange if stale else None) or "Yahoo Finance",
+                    market_time=market_time,
+                    market_state=market_state,
+                    exchange_timezone=timezone_name,
+                    fetched_at=fetched_at.isoformat(),
+                    day_open=_optional_quote_float(latest.get("Open")),
+                    day_high=_optional_quote_float(latest.get("High")),
+                    day_low=_optional_quote_float(latest.get("Low")),
+                )
+                quote_cache[symbol] = {"timestamp": time.time(), "data": quote, "detail": False}
                 quotes[symbol] = quote
-            else:
-                errors[symbol] = "ไม่พบข้อมูลหุ้น"
-        except MarketDataError as error:
-            errors[symbol] = str(error)
+            except (KeyError, TypeError, ValueError) as error:
+                print(f"yfinance batch parse error for {symbol}: {error}")
+    except MarketDataError as error:
+        print(f"yfinance batch quote error: {error}")
+
+    # A partial Yahoo response should not blank cards which already had usable data.
+    for symbol in missing:
+        if symbol in quotes:
+            continue
+        stale = _stale(quote_cache, symbol)
+        if stale is not None:
+            quotes[symbol] = stale
+        else:
+            errors[symbol] = "ไม่พบข้อมูลหุ้นจาก Yahoo Finance"
     return quotes, errors
+
+
+def get_stock_quotes(symbols: List[str]) -> tuple[Dict[str, StockQuote], Dict[str, str]]:
+    """Fetch one Yahoo batch per cold cache window, coalescing concurrent page loads."""
+    cleaned = list(dict.fromkeys(clean_symbol(symbol) for symbol in symbols if symbol.strip()))
+    cached = {
+        symbol: quote
+        for symbol in cleaned
+        if (quote := _cached(quote_cache, symbol, QUOTE_CACHE_EXPIRY)) is not None
+    }
+    if len(cached) == len(cleaned):
+        return cached, {}
+
+    # Home, alerts and portfolio can mount together. The second caller waits,
+    # rechecks the shared cache, and only downloads symbols still missing.
+    with _batch_quote_lock:
+        return _get_stock_quotes_unlocked(cleaned)
 
 
 def get_stock_info(symbol: str, price: Optional[float] = None, history_df=None) -> Optional[StockInfo]:

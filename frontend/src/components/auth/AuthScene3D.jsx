@@ -7,45 +7,177 @@ function cssVar(name, fallback) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-function hexToThree(hex) {
-  return new THREE.Color(hex.startsWith('#') ? hex : `#${hex}`);
+function color(value) {
+  return new THREE.Color(value.startsWith('#') ? value : `#${value}`);
 }
 
-function addCandle(group, x, bodyH, isLight, colors) {
-  const { purpleDark, purpleLight, accent } = colors;
-  const color = isLight ? purpleLight : purpleDark;
-  const glow = isLight ? purpleLight : purpleDark;
+function glowingMaterial(value, intensity = 1) {
+  return new THREE.MeshStandardMaterial({
+    color: color(value),
+    emissive: color(value),
+    emissiveIntensity: intensity,
+    metalness: 0.45,
+    roughness: 0.25,
+  });
+}
 
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, bodyH, 0.5),
-    new THREE.MeshStandardMaterial({
-      color: hexToThree(color),
-      emissive: hexToThree(glow),
-      emissiveIntensity: isLight ? 0.2 : 0.12,
-      metalness: 0.25,
-      roughness: 0.45,
+function buildIntelligenceCore(root, palette, compact) {
+  const animated = [];
+  const core = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(compact ? 1.05 : 1.55, 2),
+    new THREE.MeshPhysicalMaterial({
+      color: color(palette.primary),
+      emissive: color(palette.primary),
+      emissiveIntensity: 0.65,
+      metalness: 0.65,
+      roughness: 0.18,
+      clearcoat: 1,
+      clearcoatRoughness: 0.12,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.92,
     }),
   );
-  body.position.set(x, bodyH / 2, 0);
+  root.add(core);
 
-  const wickH = bodyH + 0.55;
-  const wick = new THREE.Mesh(
-    new THREE.BoxGeometry(0.05, wickH, 0.05),
+  const shell = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(compact ? 1.32 : 1.95, 1),
     new THREE.MeshBasicMaterial({
-      color: hexToThree(accent),
-      transparent: true,
-      opacity: 0.4,
+      color: color(palette.accent), wireframe: true, transparent: true, opacity: 0.26,
     }),
   );
-  wick.position.set(x, wickH / 2, 0);
+  root.add(shell);
 
-  group.add(body, wick);
-  return { body, wick, baseH: bodyH, x };
+  const rings = [
+    [compact ? 1.8 : 2.8, palette.primary, [1.05, 0.05, 0.2]],
+    [compact ? 2.2 : 3.6, palette.accent, [0.15, 0.95, 0.55]],
+    [compact ? 2.55 : 4.35, palette.success, [0.75, 0.35, 1.05]],
+  ].map(([radius, ringColor, rotation], index) => {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(radius, compact ? 0.018 : 0.028, 8, 128),
+      new THREE.MeshBasicMaterial({
+        color: color(ringColor), transparent: true, opacity: 0.42 - index * 0.07,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    ring.rotation.set(...rotation);
+    root.add(ring);
+    return ring;
+  });
+
+  const satellites = [];
+  const connections = [];
+  const count = compact ? 8 : 15;
+  for (let index = 0; index < count; index += 1) {
+    const phi = Math.acos(1 - (2 * (index + 0.5)) / count);
+    const theta = Math.PI * (1 + Math.sqrt(5)) * index;
+    const radius = compact ? 2.45 : 4.15;
+    const position = new THREE.Vector3(
+      radius * Math.sin(phi) * Math.cos(theta),
+      radius * Math.cos(phi) * 0.72,
+      radius * Math.sin(phi) * Math.sin(theta),
+    );
+    const nodeColor = [palette.primary, palette.accent, palette.success][index % 3];
+    const node = new THREE.Mesh(
+      new THREE.SphereGeometry(compact ? 0.07 : 0.11, 16, 16),
+      glowingMaterial(nodeColor, 1.6),
+    );
+    node.position.copy(position);
+    node.userData = { phase: index * 0.73, baseScale: index % 4 === 0 ? 1.5 : 1 };
+    root.add(node);
+    satellites.push(node);
+    connections.push(0, 0, 0, position.x, position.y, position.z);
+  }
+
+  const lineGeometry = new THREE.BufferGeometry();
+  lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(connections, 3));
+  const network = new THREE.LineSegments(
+    lineGeometry,
+    new THREE.LineBasicMaterial({
+      color: color(palette.primary), transparent: true, opacity: 0.13,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    }),
+  );
+  root.add(network);
+  animated.push({ core, shell, rings, satellites, network });
+  return animated;
 }
 
-export default function AuthScene3D({ compact = false, className = '' }) {
+function buildPortfolioDna(root, palette, compact) {
+  const animated = [];
+  const turns = compact ? 2.5 : 3.7;
+  const count = compact ? 42 : 76;
+  const radius = compact ? 1.25 : 1.85;
+  const height = compact ? 4.2 : 6.8;
+  const strandA = [];
+  const strandB = [];
+
+  for (let index = 0; index < count; index += 1) {
+    const progress = index / (count - 1);
+    const angle = progress * Math.PI * 2 * turns;
+    const y = (progress - 0.5) * height;
+    strandA.push(new THREE.Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius));
+    strandB.push(new THREE.Vector3(Math.cos(angle + Math.PI) * radius, y, Math.sin(angle + Math.PI) * radius));
+  }
+
+  const makeStrand = (points, strandColor) => new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), count * 2, compact ? 0.035 : 0.055, 8, false),
+    new THREE.MeshBasicMaterial({
+      color: color(strandColor), transparent: true, opacity: 0.78,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  const helixA = makeStrand(strandA, palette.primary);
+  const helixB = makeStrand(strandB, palette.accent);
+  root.add(helixA, helixB);
+
+  const rungs = [];
+  const rungGeometry = new THREE.BufferGeometry();
+  const rungPositions = [];
+  const step = compact ? 5 : 6;
+  for (let index = 0; index < count; index += step) {
+    rungPositions.push(...strandA[index].toArray(), ...strandB[index].toArray());
+    [strandA[index], strandB[index]].forEach((position, side) => {
+      const bead = new THREE.Mesh(
+        new THREE.SphereGeometry(compact ? 0.075 : 0.115, 16, 16),
+        glowingMaterial(side === 0 ? palette.primary : palette.accent, 1.4),
+      );
+      bead.position.copy(position);
+      bead.userData.phase = index * 0.3 + side;
+      root.add(bead);
+      rungs.push(bead);
+    });
+  }
+  rungGeometry.setAttribute('position', new THREE.Float32BufferAttribute(rungPositions, 3));
+  const bridges = new THREE.LineSegments(
+    rungGeometry,
+    new THREE.LineBasicMaterial({
+      color: color(palette.success), transparent: true, opacity: 0.28,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  root.add(bridges);
+
+  const genesisCore = new THREE.Mesh(
+    new THREE.TorusKnotGeometry(compact ? 0.44 : 0.7, compact ? 0.12 : 0.19, 120, 18),
+    glowingMaterial(palette.success, 0.85),
+  );
+  genesisCore.rotation.x = Math.PI / 2;
+  root.add(genesisCore);
+
+  const halo = new THREE.Mesh(
+    new THREE.TorusGeometry(compact ? 2.05 : 3.15, 0.025, 8, 128),
+    new THREE.MeshBasicMaterial({
+      color: color(palette.success), transparent: true, opacity: 0.3,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  halo.rotation.x = Math.PI / 2;
+  root.add(halo);
+  animated.push({ helixA, helixB, rungs, bridges, genesisCore, halo });
+  return animated;
+}
+
+export default function AuthScene3D({ compact = false, variant = 'core', className = '' }) {
   const containerRef = useRef(null);
   const { theme } = useTheme();
 
@@ -54,202 +186,142 @@ export default function AuthScene3D({ compact = false, className = '' }) {
     if (!container) return;
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const primary = cssVar('--primary', '#3b82f6');
-    const accent = cssVar('--accent', '#8b5cf6');
-    const bg = theme === 'dark' ? 0x0b0f19 : 0xeef2ff;
-    const colors = {
-      primary,
-      accent,
-      purpleDark: theme === 'dark' ? '#5b21b6' : '#6d28d9',
-      purpleLight: theme === 'dark' ? '#a78bfa' : '#c4b5fd',
+    const palette = {
+      primary: cssVar('--primary', '#3b82f6'),
+      accent: cssVar('--accent', '#8b5cf6'),
+      success: cssVar('--success', '#10b981'),
     };
-
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(bg, compact ? 0.075 : 0.052);
+    scene.fog = new THREE.FogExp2(theme === 'dark' ? 0x090d17 : 0xeef2ff, compact ? 0.07 : 0.045);
 
-    const camera = new THREE.PerspectiveCamera(compact ? 44 : 40, 1, 0.1, 100);
-    camera.position.set(0, compact ? 3 : 4, compact ? 11 : 13);
+    const camera = new THREE.PerspectiveCamera(compact ? 48 : 42, 1, 0.1, 100);
+    camera.position.set(0, 0, compact ? 8.5 : 11.5);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, compact ? 1.25 : 1.75));
     renderer.setClearColor(0x000000, 0);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = theme === 'dark' ? 1.15 : 0.92;
     container.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, theme === 'dark' ? 0.5 : 0.7));
-    const key = new THREE.DirectionalLight(hexToThree(primary), 1);
-    key.position.set(5, 8, 6);
-    scene.add(key);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x18213a, theme === 'dark' ? 1.1 : 1.6));
+    const keyLight = new THREE.PointLight(color(palette.primary), 12, 24);
+    keyLight.position.set(4, 5, 6);
+    const rimLight = new THREE.PointLight(color(palette.accent), 10, 22);
+    rimLight.position.set(-5, -2, 4);
+    scene.add(keyLight, rimLight);
 
-    const grid = new THREE.GridHelper(compact ? 20 : 28, compact ? 20 : 28, hexToThree(primary), hexToThree(accent));
-    grid.material.opacity = theme === 'dark' ? 0.14 : 0.1;
-    grid.material.transparent = true;
-    grid.position.y = 0;
-    scene.add(grid);
+    const root = new THREE.Group();
+    root.rotation.x = variant === 'dna' ? -0.12 : 0.08;
+    scene.add(root);
+    const animated = variant === 'dna'
+      ? buildPortfolioDna(root, palette, compact)
+      : buildIntelligenceCore(root, palette, compact);
 
-    const chart = new THREE.Group();
-    scene.add(chart);
-
-    const specs = compact
-      ? [[1.2, true], [1.8, false], [1.5, true], [2.2, true], [1.7, false], [2.5, true]]
-      : [[1.1, true], [1.6, false], [1.3, true], [2.0, true], [1.5, false], [2.4, true], [2.0, true], [2.8, true], [2.3, false], [3.0, true]];
-
-    const candles = specs.map(([h, up], i) => {
-      const x = (i - (specs.length - 1) / 2) * (compact ? 0.85 : 0.9);
-      return addCandle(chart, x, h, up, colors);
-    });
-
-    chart.rotation.x = -0.18;
-    chart.position.y = 0.1;
-
-    const trendPts = candles.map((c) => new THREE.Vector3(c.x, c.baseH + 0.5, 0.35));
-    const curve = new THREE.CatmullRomCurve3(trendPts);
-    const tube = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 80, 0.045, 8, false),
-      new THREE.MeshBasicMaterial({
-        color: hexToThree(accent),
-        transparent: true,
-        opacity: theme === 'dark' ? 0.8 : 0.6,
-      }),
-    );
-    chart.add(tube);
-
-    const rings = [];
-    [2.8, 3.6].forEach((r, i) => {
-      const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(r, 0.012, 8, 64),
-        new THREE.MeshBasicMaterial({
-          color: hexToThree(i === 0 ? accent : primary),
-          transparent: true,
-          opacity: theme === 'dark' ? 0.2 : 0.12,
-        }),
-      );
-      ring.rotation.x = Math.PI / 2;
-      ring.position.y = 0.05;
-      scene.add(ring);
-      rings.push(ring);
-    });
-
-    const floaters = [
-      { geo: new THREE.IcosahedronGeometry(compact ? 0.5 : 0.7, 1), pos: [-4, 3.5, -3], color: accent },
-      { geo: new THREE.OctahedronGeometry(compact ? 0.45 : 0.6, 0), pos: [4.2, 4, -4], color: colors.purpleLight },
-    ].map(({ geo, pos, color }) => {
-      const m = new THREE.Mesh(
-        geo,
-        new THREE.MeshBasicMaterial({
-          color: hexToThree(color),
-          wireframe: true,
-          transparent: true,
-          opacity: theme === 'dark' ? 0.35 : 0.22,
-        }),
-      );
-      m.position.set(...pos);
-      m.userData = { baseY: pos[1], phase: Math.random() * Math.PI * 2 };
-      scene.add(m);
-      return m;
-    });
-
-    const particleCount = compact ? 120 : 280;
-    const positions = new Float32Array(particleCount * 3);
-    for (let i = 0; i < particleCount; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * (compact ? 16 : 22);
-      positions[i * 3 + 1] = Math.random() * (compact ? 8 : 10) + 0.5;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * (compact ? 12 : 16);
+    const particleCount = compact ? 180 : 520;
+    const particlePositions = new Float32Array(particleCount * 3);
+    const particleColors = new Float32Array(particleCount * 3);
+    const paletteColors = [color(palette.primary), color(palette.accent), color(palette.success)];
+    for (let index = 0; index < particleCount; index += 1) {
+      const distance = compact ? 11 : 17;
+      particlePositions[index * 3] = (Math.random() - 0.5) * distance;
+      particlePositions[index * 3 + 1] = (Math.random() - 0.5) * distance;
+      particlePositions[index * 3 + 2] = (Math.random() - 0.5) * distance;
+      const particleColor = paletteColors[index % paletteColors.length];
+      particleColors[index * 3] = particleColor.r;
+      particleColors[index * 3 + 1] = particleColor.g;
+      particleColors[index * 3 + 2] = particleColor.b;
     }
-    const particleGeo = new THREE.BufferGeometry();
-    particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const particleGeometry = new THREE.BufferGeometry();
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+    particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
     const particles = new THREE.Points(
-      particleGeo,
+      particleGeometry,
       new THREE.PointsMaterial({
-        size: compact ? 0.04 : 0.05,
-        color: hexToThree(accent),
-        transparent: true,
-        opacity: theme === 'dark' ? 0.45 : 0.3,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
+        size: compact ? 0.045 : 0.065, vertexColors: true, transparent: true,
+        opacity: theme === 'dark' ? 0.75 : 0.5, blending: THREE.AdditiveBlending, depthWrite: false,
       }),
     );
     scene.add(particles);
 
-    const resize = () => {
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-      if (!w || !h) return;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-      camera.lookAt(0, compact ? 1.5 : 1.8, 0);
+    const pointer = { x: 0, y: 0 };
+    const onPointerMove = (event) => {
+      const rect = container.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+      pointer.y = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
     };
+    container.addEventListener('pointermove', onPointerMove, { passive: true });
 
-    const ro = new ResizeObserver(resize);
-    ro.observe(container);
+    const resize = () => {
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      if (!width || !height) return;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    };
+    const observer = new ResizeObserver(resize);
+    observer.observe(container);
     resize();
 
-    let frameId = 0;
     const clock = new THREE.Clock();
-    const baseRotY = compact ? 0.1 : -0.2;
-
+    let frameId = 0;
     const animate = () => {
       frameId = requestAnimationFrame(animate);
-      const t = clock.getElapsedTime();
+      const elapsed = clock.getElapsedTime();
 
       if (!reducedMotion) {
-        chart.rotation.y = baseRotY + Math.sin(t * 0.22) * 0.15;
+        root.rotation.y += 0.0022;
+        root.position.y = Math.sin(elapsed * 0.55) * (compact ? 0.08 : 0.16);
+        particles.rotation.y = elapsed * 0.012;
+        particles.rotation.x = Math.sin(elapsed * 0.1) * 0.08;
 
-        candles.forEach((c, i) => {
-          const pulse = 1 + Math.sin(t * 1.1 + i * 0.5) * 0.06;
-          c.body.scale.y = pulse;
-          c.body.position.y = (c.baseH * pulse) / 2;
-          c.wick.position.y = (c.baseH * pulse + 0.55) / 2;
-        });
+        if (variant === 'dna') {
+          const dna = animated[0];
+          dna.genesisCore.rotation.x += 0.01;
+          dna.genesisCore.rotation.y += 0.014;
+          dna.halo.rotation.z = elapsed * 0.22;
+          dna.rungs.forEach((bead) => {
+            const pulse = 0.85 + Math.sin(elapsed * 2 + bead.userData.phase) * 0.2;
+            bead.scale.setScalar(pulse);
+          });
+        } else {
+          const core = animated[0];
+          core.core.rotation.x += 0.004;
+          core.core.rotation.y += 0.007;
+          core.shell.rotation.x -= 0.0025;
+          core.shell.rotation.y += 0.0035;
+          core.rings.forEach((ring, index) => { ring.rotation.z += 0.0015 + index * 0.0007; });
+          core.satellites.forEach((node) => {
+            const pulse = node.userData.baseScale * (0.9 + Math.sin(elapsed * 1.8 + node.userData.phase) * 0.18);
+            node.scale.setScalar(pulse);
+          });
+        }
 
-        rings.forEach((ring, i) => {
-          ring.rotation.z = t * (0.08 + i * 0.04);
-        });
-
-        floaters.forEach((m) => {
-          m.rotation.x += 0.004;
-          m.rotation.y += 0.006;
-          m.position.y = m.userData.baseY + Math.sin(t * 0.5 + m.userData.phase) * 0.3;
-        });
-
-        particles.rotation.y = t * 0.015;
-        grid.rotation.y = t * 0.025;
-
-        camera.position.x = Math.sin(t * 0.12) * 0.6;
-        camera.position.y = (compact ? 3 : 4) + Math.sin(t * 0.1) * 0.25;
-        camera.lookAt(0, compact ? 1.5 : 1.8, 0);
+        camera.position.x += (pointer.x * (compact ? 0.3 : 0.8) - camera.position.x) * 0.025;
+        camera.position.y += (-pointer.y * (compact ? 0.2 : 0.55) - camera.position.y) * 0.025;
+        camera.lookAt(0, 0, 0);
       }
-
       renderer.render(scene, camera);
     };
     animate();
 
     return () => {
       cancelAnimationFrame(frameId);
-      ro.disconnect();
-      renderer.dispose();
-      particleGeo.dispose();
-      particles.material.dispose();
-      tube.geometry.dispose();
-      tube.material.dispose();
-      grid.geometry.dispose();
-      grid.material.dispose();
-      chart.traverse((obj) => {
-        if (obj.geometry) obj.geometry.dispose();
-        if (obj.material) {
-          if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
-          else obj.material.dispose();
+      observer.disconnect();
+      container.removeEventListener('pointermove', onPointerMove);
+      scene.traverse((object) => {
+        if (object.geometry) object.geometry.dispose();
+        if (object.material) {
+          if (Array.isArray(object.material)) object.material.forEach((material) => material.dispose());
+          else object.material.dispose();
         }
       });
-      rings.forEach((m) => { m.geometry.dispose(); m.material.dispose(); });
-      floaters.forEach((m) => { m.geometry.dispose(); m.material.dispose(); });
-      if (renderer.domElement.parentNode === container) {
-        container.removeChild(renderer.domElement);
-      }
+      renderer.dispose();
+      if (renderer.domElement.parentNode === container) container.removeChild(renderer.domElement);
     };
-  }, [theme, compact]);
+  }, [theme, compact, variant]);
 
-  return (
-    <div ref={containerRef} className={`w-full h-full ${className}`} aria-hidden="true" />
-  );
+  return <div ref={containerRef} className={`h-full w-full ${className}`} aria-hidden="true" />;
 }

@@ -10,7 +10,7 @@ const COLORS = [
 function groupBySector(positions) {
   const map = {};
   for (const p of positions) {
-    const sector = p.sector || 'อื่นๆ';
+    const sector = p.sector || 'ไม่พบ Sector จาก Yahoo';
     map[sector] = (map[sector] || 0) + (p.market_value || 0);
   }
   return Object.entries(map)
@@ -61,7 +61,13 @@ function PieChartSvg({ slices }) {
   );
 }
 
-export default function PortfolioDashboard({ positions, totalValue, portfolioCurrency }) {
+export default function PortfolioDashboard({
+  positions,
+  totalValue,
+  portfolioCurrency,
+  sectorLoading = false,
+  sectorError = null,
+}) {
   const withValue = positions.filter((p) => p.market_value != null);
   const symbolSlices = allocationBySymbol(withValue, totalValue);
   const sectors = groupBySector(withValue);
@@ -122,28 +128,52 @@ export default function PortfolioDashboard({ positions, totalValue, portfolioCur
         </div>
 
         <div className="glass-card rounded-2xl p-5">
-          <h3 className="text-sm font-bold mb-4">สัดส่วนตาม Sector</h3>
-          <div className="space-y-3">
-            {sectors.map(({ name, value }) => (
-              <div key={name}>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-muted truncate pr-2">{name}</span>
-                  <span className="font-mono font-bold shrink-0">
-                    {totalValue ? ((value / totalValue) * 100).toFixed(1) : 0}%
-                  </span>
-                </div>
-                <div className="h-2 rounded-full bg-surface border border-border/40 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary/70 transition-all"
-                    style={{ width: `${Math.max(4, (value / maxSector) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-            {sectors.length === 0 && (
-              <p className="text-xs text-muted">ไม่มีข้อมูล sector</p>
+          <div className="mb-4">
+            <h3 className="text-sm font-bold">สัดส่วนตาม Sector</h3>
+            <p className="mt-0.5 text-[11px] text-muted">จัดกลุ่มจากข้อมูลบริษัท Yahoo Finance อัปเดตวันละครั้ง</p>
+            {!portfolioCurrency && (
+              <p className="mt-1 text-[11px] text-warning">
+                พอร์ตมีหลายสกุลเงิน สัดส่วนนี้ยังไม่รวมผลจากอัตราแลกเปลี่ยน
+              </p>
             )}
           </div>
+          {sectorLoading ? (
+            <div className="space-y-3" aria-label="กำลังโหลดข้อมูล Sector">
+              {[72, 48, 31].map((width) => (
+                <div key={width} className="animate-pulse">
+                  <div className="mb-1.5 h-3 rounded bg-surface" style={{ width: `${width}%` }} />
+                  <div className="h-2 rounded-full bg-surface" />
+                </div>
+              ))}
+              <p className="text-xs text-muted">กำลังจัดกลุ่ม Sector จากข้อมูลบริษัท Yahoo Finance...</p>
+            </div>
+          ) : sectorError ? (
+            <p className="rounded-xl border border-warning/20 bg-warning/5 p-3 text-xs text-warning">
+              โหลด Sector ไม่สำเร็จ: {sectorError}
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {sectors.map(({ name, value }) => (
+                <div key={name}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-muted truncate pr-2">{name}</span>
+                    <span className="font-mono font-bold shrink-0">
+                      {totalValue ? ((value / totalValue) * 100).toFixed(1) : 0}%
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-surface border border-border/40 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary/70 transition-all"
+                      style={{ width: `${Math.max(4, (value / maxSector) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+              {sectors.length === 0 && (
+                <p className="text-xs text-muted">ไม่มีข้อมูล Sector</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

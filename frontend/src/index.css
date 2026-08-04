@@ -124,6 +124,24 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+::selection {
+  color: white;
+  background: color-mix(in srgb, var(--primary) 72%, var(--accent));
+}
+
+:where(a, button, input, textarea, select):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+button, a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 /* ป้าย/หัวตาราง — ตัวเล็กแต่อ่านได้ */
 .text-xs.uppercase {
   letter-spacing: 0.03em;
@@ -302,6 +320,42 @@ select.select-native:disabled {
     transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ── Auth & shared form controls ── */
+.auth-input {
+  min-height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+  padding-right: 1rem;
+  color: var(--foreground);
+  font-size: 0.9rem;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+.auth-input::placeholder { color: color-mix(in srgb, var(--muted) 72%, transparent); }
+.auth-input:hover { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); }
+.auth-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+.auth-input:-webkit-autofill {
+  -webkit-text-fill-color: var(--foreground);
+  box-shadow: 0 0 0 1000px var(--surface) inset;
+  transition: background-color 9999s ease-out;
+}
+.auth-submit {
+  min-height: 48px;
+  border-radius: 0.875rem;
+  padding: 0.7rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.auth-submit:active:not(:disabled) { transform: translateY(1px) scale(0.995); }
+.auth-submit:disabled { opacity: 0.55; box-shadow: none; transform: none; }
+
 /* ── Buttons ── */
 .btn-hover {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -363,4 +417,13 @@ select.select-native:disabled {
 /* ── Page enter ── */
 .page-enter {
   animation: fadeIn 0.5s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

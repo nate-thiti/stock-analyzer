@@ -7,6 +7,12 @@ import {
 } from './utils/dateFormat.js';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const FIVE_MINUTES = 5 * 60_000;
+const ONE_DAY = 24 * 60 * 60_000;
+const CACHE_PREFIX = 'stock-analyzer-cache:v1:';
+const MAX_SESSION_ENTRY_BYTES = 250_000;
+const responseCache = new Map();
+const inFlightRequests = new Map();
 
 export { formatCalendarDateYmd, calendarDateInTimezone, formatHistoryDate, isDailyChartInterval };
 
@@ -20,41 +26,132 @@ class AuthError extends Error {
   }
 }
 
-async function fetchJSON(url, options = {}) {
-  const res = await fetch(`${API_BASE}${url}`, {
-    credentials: 'include',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-  if (res.status === 401) {
-    throw new AuthError('กรุณาเข้าสู่ระบบ');
+function cacheKey(url) {
+  return `${CACHE_PREFIX}${url}`;
+}
+
+function readCached(url) {
+  const key = cacheKey(url);
+  const memory = responseCache.get(key);
+  if (memory && memory.expiresAt > Date.now()) return memory.data;
+  if (memory) responseCache.delete(key);
+
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return undefined;
+    const entry = JSON.parse(raw);
+    if (entry.expiresAt <= Date.now()) {
+      sessionStorage.removeItem(key);
+      return undefined;
+    }
+    responseCache.set(key, entry);
+    return entry.data;
+  } catch {
+    return undefined;
   }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const detail = err.detail;
-    const message = Array.isArray(detail)
-      ? detail.map((d) => d.msg).join(', ')
-      : (detail || `HTTP ${res.status}`);
-    throw new Error(message);
+}
+
+function writeCached(url, data, ttlMs) {
+  const key = cacheKey(url);
+  const entry = { expiresAt: Date.now() + ttlMs, data };
+  responseCache.set(key, entry);
+  try {
+    const serialized = JSON.stringify(entry);
+    // Large chart/indicator payloads stay in memory; compact quotes and company
+    // profiles survive navigation/reload without exhausting sessionStorage.
+    if (serialized.length <= MAX_SESSION_ENTRY_BYTES) {
+      sessionStorage.setItem(key, serialized);
+    }
+  } catch {
+    // Memory cache still provides fast navigation when storage is unavailable/full.
   }
-  if (res.status === 204) return null;
-  return res.json();
+}
+
+function removeCached(url) {
+  const key = cacheKey(url);
+  responseCache.delete(key);
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // sessionStorage may be disabled.
+  }
+}
+
+export function clearApiCache(patterns = []) {
+  const matches = (key) => patterns.length === 0 || patterns.some((pattern) => key.includes(pattern));
+  for (const key of responseCache.keys()) {
+    if (matches(key)) responseCache.delete(key);
+  }
+  try {
+    for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+      const key = sessionStorage.key(index);
+      if (key?.startsWith(CACHE_PREFIX) && matches(key)) sessionStorage.removeItem(key);
+    }
+  } catch {
+    // sessionStorage may be disabled; memory invalidation above is sufficient.
+  }
+}
+
+async function fetchJSON(url, options = {}, { ttlMs = 0, shouldCache = null } = {}) {
+  const cacheable = ttlMs > 0 && !options.method;
+  if (cacheable) {
+    const cached = readCached(url);
+    if (cached !== undefined && (!shouldCache || shouldCache(cached))) return cached;
+    if (cached !== undefined) removeCached(url);
+    if (inFlightRequests.has(url)) return inFlightRequests.get(url);
+  }
+
+  const request = (async () => {
+    const res = await fetch(`${API_BASE}${url}`, {
+      credentials: 'include',
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+    if (res.status === 401) {
+      throw new AuthError('กรุณาเข้าสู่ระบบ');
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const detail = err.detail;
+      const message = Array.isArray(detail)
+        ? detail.map((d) => d.msg).join(', ')
+        : (detail || `HTTP ${res.status}`);
+      throw new Error(message);
+    }
+    if (res.status === 204) return null;
+    const data = await res.json();
+    if (cacheable && (!shouldCache || shouldCache(data))) writeCached(url, data, ttlMs);
+    return data;
+  })();
+
+  if (cacheable) inFlightRequests.set(url, request);
+  try {
+    return await request;
+  } finally {
+    if (cacheable) inFlightRequests.delete(url);
+  }
+}
+
+async function mutateJSON(url, options, invalidatePatterns = []) {
+  const result = await fetchJSON(url, options);
+  if (invalidatePatterns.length > 0) clearApiCache(invalidatePatterns);
+  return result;
 }
 
 export const api = {
   login: (email, password) =>
-    fetchJSON('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    mutateJSON('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }, ['/analysis/', '/portfolio/']),
   register: (username, email, password) =>
-    fetchJSON('/auth/register', { method: 'POST', body: JSON.stringify({ username, email, password }) }),
-  logout: () => fetchJSON('/auth/logout', { method: 'POST' }),
+    mutateJSON('/auth/register', { method: 'POST', body: JSON.stringify({ username, email, password }) }, ['/analysis/', '/portfolio/']),
+  logout: () => mutateJSON('/auth/logout', { method: 'POST' }, ['/analysis/', '/portfolio/']),
   me: () => fetchJSON('/auth/me'),
 
   getRiskProfile: () => fetchJSON('/me/risk-profile'),
   updateRiskProfile: (data) =>
-    fetchJSON('/me/risk-profile', { method: 'PATCH', body: JSON.stringify(data) }),
+    mutateJSON('/me/risk-profile', { method: 'PATCH', body: JSON.stringify(data) }, ['/analysis/', '/portfolio/']),
 
   listUsers: () => fetchJSON('/users'),
   createUser: (data) => fetchJSON('/users', { method: 'POST', body: JSON.stringify(data) }),
@@ -67,15 +164,15 @@ export const api = {
 
   listPositions: () => fetchJSON('/positions'),
   portfolioIntelligence: (period = '6mo') =>
-    fetchJSON(`/portfolio/intelligence?period=${encodeURIComponent(period)}`),
+    fetchJSON(`/portfolio/intelligence?period=${encodeURIComponent(period)}`, {}, { ttlMs: FIVE_MINUTES }),
   simulatePortfolio: (data, period = '6mo') =>
     fetchJSON(`/portfolio/simulate?period=${encodeURIComponent(period)}`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  createPosition: (data) => fetchJSON('/positions', { method: 'POST', body: JSON.stringify(data) }),
-  updatePosition: (id, data) => fetchJSON(`/positions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deletePosition: (id) => fetchJSON(`/positions/${id}`, { method: 'DELETE' }),
+  createPosition: (data) => mutateJSON('/positions', { method: 'POST', body: JSON.stringify(data) }, ['/analysis/', '/portfolio/']),
+  updatePosition: (id, data) => mutateJSON(`/positions/${id}`, { method: 'PUT', body: JSON.stringify(data) }, ['/analysis/', '/portfolio/']),
+  deletePosition: (id) => mutateJSON(`/positions/${id}`, { method: 'DELETE' }, ['/analysis/', '/portfolio/']),
 
   listPriceAlerts: () => fetchJSON('/price-alerts'),
   createPriceAlert: (data) => fetchJSON('/price-alerts', { method: 'POST', body: JSON.stringify(data) }),
@@ -84,28 +181,38 @@ export const api = {
   getWatchlist: () => fetchJSON('/watchlist'),
   setWatchlist: (symbols) => fetchJSON('/watchlist', { method: 'PUT', body: JSON.stringify({ symbols }) }),
 
-  quote: (symbol) => fetchJSON(`/stock/quote?symbol=${encodeURIComponent(symbol)}`),
+  quote: (symbol) => fetchJSON(`/stock/quote?symbol=${encodeURIComponent(symbol)}`, {}, { ttlMs: FIVE_MINUTES }),
   quotes: (symbols) =>
-    fetchJSON(`/stock/quotes?symbols=${encodeURIComponent(symbols.join(','))}`),
-  info: (symbol) => fetchJSON(`/stock/info?symbol=${encodeURIComponent(symbol)}`),
+    fetchJSON(
+      `/stock/quotes?symbols=${encodeURIComponent(symbols.join(','))}`,
+      {},
+      {
+        ttlMs: FIVE_MINUTES,
+        shouldCache: (data) => Object.keys(data?.quotes || {}).length > 0
+          && Object.keys(data?.errors || {}).length === 0,
+      },
+    ),
+  info: (symbol) => fetchJSON(`/stock/info?symbol=${encodeURIComponent(symbol)}`, {}, { ttlMs: ONE_DAY }),
   history: (symbol, period, interval) =>
-    fetchJSON(`/stock/history?symbol=${encodeURIComponent(symbol)}&period=${period}&interval=${interval}`),
-  search: (q) => fetchJSON(`/stock/search?q=${encodeURIComponent(q)}`),
+    fetchJSON(`/stock/history?symbol=${encodeURIComponent(symbol)}&period=${period}&interval=${interval}`, {}, { ttlMs: FIVE_MINUTES }),
+  search: (q) => fetchJSON(`/stock/search?q=${encodeURIComponent(q)}`, {}, { ttlMs: ONE_DAY }),
   analysis: (symbol, period, interval, accountSize = DEFAULT_ACCOUNT_SIZE, riskPct = DEFAULT_RISK_PCT) =>
     fetchJSON(
       `/analysis/full?symbol=${encodeURIComponent(symbol)}&period=${period}&interval=${interval}` +
-      `&account_size=${accountSize}&risk_pct=${riskPct}`
+      `&account_size=${accountSize}&risk_pct=${riskPct}`,
+      {},
+      { ttlMs: FIVE_MINUTES },
     ),
   compare: (symbols, period = '6mo', interval = '1d', accountSize, riskPct) => {
     const params = new URLSearchParams({ symbols, period, interval });
     if (accountSize != null) params.set('account_size', accountSize);
     if (riskPct != null) params.set('risk_pct', riskPct);
-    return fetchJSON(`/analysis/compare?${params.toString()}`);
+    return fetchJSON(`/analysis/compare?${params.toString()}`, {}, { ttlMs: FIVE_MINUTES });
   },
   quarterlyFundamentals: (symbol) =>
-    fetchJSON(`/stock/fundamentals/quarterly?symbol=${encodeURIComponent(symbol)}`),
+    fetchJSON(`/stock/fundamentals/quarterly?symbol=${encodeURIComponent(symbol)}`, {}, { ttlMs: ONE_DAY }),
   peHistory: (symbol, period = '2y') =>
-    fetchJSON(`/stock/fundamentals/pe-history?symbol=${encodeURIComponent(symbol)}&period=${period}`),
+    fetchJSON(`/stock/fundamentals/pe-history?symbol=${encodeURIComponent(symbol)}&period=${period}`, {}, { ttlMs: FIVE_MINUTES }),
   marketSignals: (refresh = false, scope = 'global') => {
     const params = new URLSearchParams();
     if (refresh) params.set('refresh', 'true');

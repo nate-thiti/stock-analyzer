@@ -110,7 +110,7 @@ export default function MarketSignalSections() {
             <span className="ml-1">• ยังไม่ได้ถือ {data?.candidates_scanned || 0}</span>
             {data?.updated_at && <span> • อัปเดต {formatUpdated(data.updated_at)}</span>}
             {data?.refreshing && <span className="text-warning ml-1">• กำลังอัปเดตเบื้องหลัง</span>}
-            <span className="text-primary/70 ml-1">• auto 15m</span>
+            <span className="text-primary/70 ml-1">• auto 5m</span>
           </p>
         </div>
         <button

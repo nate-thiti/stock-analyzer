@@ -7,6 +7,8 @@ import {
 import { api, ACTION_STYLES, GRADE_LABELS, POPULAR_STOCKS, COMPARE_PRESET_GROUPS, formatPct, formatMoney } from '../api';
 import CompareValuationChart from '../components/valuation/CompareValuationChart';
 import { riskToleranceLabel, useRiskProfile, RISK_USAGE_BAND_LABELS } from '../context/RiskProfileContext';
+import { ANALYSIS_POLL_MS, useQuotePoll } from '../hooks/useQuotePoll';
+import DataFreshnessNotice from '../components/DataFreshnessNotice';
 
 const MAX_STOCKS = 5;
 const MIN_STOCKS = 2;
@@ -165,6 +167,23 @@ export default function ComparePage() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const comparedSymbolKey = data?.symbols?.join(',') || '';
+  const refreshComparison = useCallback(async () => {
+    if (!comparedSymbolKey) return;
+    try {
+      const result = await api.compare(comparedSymbolKey, '6mo', '1d');
+      setData(result);
+    } catch {
+      // Keep the last complete comparison visible when Yahoo is temporarily unavailable.
+    }
+  }, [comparedSymbolKey]);
+
+  useQuotePoll(refreshComparison, {
+    enabled: Boolean(comparedSymbolKey),
+    intervalMs: ANALYSIS_POLL_MS,
+    immediate: false,
+  });
+
   const addSymbol = (sym) => {
     const upper = sym.trim().toUpperCase();
     if (!upper || symbols.includes(upper)) return;
@@ -241,6 +260,8 @@ export default function ComparePage() {
         </h2>
         <p className="text-sm text-muted mt-1">เลือก 2–5 หุ้น แล้วเปรียบเทียบโดยรวมสถานะในพอร์ตและความเสี่ยงส่วนบุคคล</p>
       </div>
+
+      <DataFreshnessNotice />
 
       {profile?.configured ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-primary/25 bg-primary/5 px-4 py-3 text-xs">

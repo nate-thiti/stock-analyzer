@@ -50,6 +50,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def market_data_cache_headers(request: Request, call_next):
+    """Let each browser reuse Yahoo-backed GETs without making shared/public caches unsafe."""
+    response = await call_next(request)
+    if request.method != "GET" or response.status_code >= 400:
+        return response
+
+    path = request.url.path
+    daily_paths = ("/api/stock/info", "/api/stock/search", "/api/stock/fundamentals/quarterly")
+    five_minute_paths = ("/api/stock/quote", "/api/stock/quotes", "/api/stock/history", "/api/stock/fundamentals/pe-history")
+    if path in daily_paths:
+        response.headers["Cache-Control"] = "private, max-age=86400, stale-while-revalidate=3600"
+    elif path in five_minute_paths:
+        response.headers["Cache-Control"] = "private, max-age=300, stale-while-revalidate=60"
+    return response
+
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(favorites.router)
@@ -146,13 +163,14 @@ def _run_analysis(
     risk_pct: float = 2.0,
     user: Optional[User] = None,
     db: Optional[Session] = None,
+    quote_override: Optional[StockQuote] = None,
 ) -> AnalysisResponse:
     history = get_stock_history(symbol, period, interval)
     if not history:
         raise HTTPException(status_code=404, detail=f"ไม่พบข้อมูลราคา '{symbol}'")
 
     df = _history_to_df(history)
-    quote = get_stock_quote(symbol)
+    quote = quote_override or get_stock_quote(symbol)
     current_price = quote.price if quote else float(df["Close"].iloc[-1])
     currency = quote.currency if quote else "USD"
 
@@ -249,6 +267,10 @@ def get_quotes(symbols: str = Query(..., description="สัญลักษณ�
     if len(symbol_list) > 30:
         raise HTTPException(status_code=400, detail="ขอราคาได้สูงสุด 30 หุ้นต่อครั้ง")
     quotes, errors = get_stock_quotes(symbol_list)
+    if not quotes and errors:
+        raise MarketDataError(
+            "ไม่สามารถเชื่อมต่อ Yahoo Finance ได้ชั่วคราว กรุณาลองใหม่อีกครั้ง"
+        )
     return QuoteBatchResponse(quotes=quotes, errors=errors)
 
 
@@ -356,10 +378,14 @@ def compare_stocks(
     if len(symbol_list) > 5:
         raise HTTPException(status_code=400, detail="เปรียบเทียบได้สูงสุด 5 หุ้น")
 
+    batch_quotes, _quote_errors = get_stock_quotes(symbol_list)
     results = []
     for sym in symbol_list:
         try:
-            results.append(_run_analysis(sym, period, interval, acct, risk, user=user, db=db))
+            results.append(_run_analysis(
+                sym, period, interval, acct, risk, user=user, db=db,
+                quote_override=batch_quotes.get(sym),
+            ))
         except HTTPException:
             results.append(AnalysisResponse(symbol=sym, recommendation="error", confidence=0))
 
@@ -399,10 +425,15 @@ async def batch_analysis(
 ):
     acct = body.account_size if body.account_size else resolve_account_size(db, user.id, 100_000.0)
     risk = body.risk_pct if body.risk_pct else (user.risk_per_trade_pct or 2.0)
+    cleaned_symbols = [symbol.strip().upper() for symbol in body.symbols if symbol.strip()]
+    batch_quotes, _quote_errors = get_stock_quotes(cleaned_symbols)
     results = []
-    for symbol in body.symbols:
+    for symbol in cleaned_symbols:
         try:
-            results.append(_run_analysis(symbol, body.period, body.interval, acct, risk, user=user, db=db))
+            results.append(_run_analysis(
+                symbol, body.period, body.interval, acct, risk, user=user, db=db,
+                quote_override=batch_quotes.get(symbol),
+            ))
         except HTTPException as e:
             results.append({"symbol": symbol, "error": e.detail})
         except Exception as e:

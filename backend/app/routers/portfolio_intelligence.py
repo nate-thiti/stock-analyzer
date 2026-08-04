@@ -53,7 +53,8 @@ def _load_snapshots(db: Session, user_id: int) -> List[dict]:
             symbol = futures[future]
             try:
                 profiles[symbol] = future.result()
-            except MarketDataError:
+            except Exception as error:
+                print(f"Portfolio profile skip {symbol}: {error}")
                 profiles[symbol] = (None, None)
 
     snapshots = []

@@ -9,6 +9,7 @@ import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import SelectField from '../components/SelectField';
 import SegmentedControl from '../components/SegmentedControl';
 import { computeDistanceToTrigger, distanceColorClass } from '../utils/priceAlert';
+import DataFreshnessNotice from '../components/DataFreshnessNotice';
 
 function directionLabel(direction) {
   return direction === 'above' ? 'ราคา ≥ เป้า' : 'ราคา ≤ เป้า';
@@ -76,7 +77,7 @@ export default function AlertsPage() {
             แจ้งเตือนราคา
           </h2>
           <p className="text-sm text-muted mt-1">
-            จัดการ alert ทั้งหมด — ตรวจอัตโนมัติทุก 1 นาที
+            จัดการ alert ทั้งหมด — ตรวจราคาจาก Yahoo แบบ batch ทุก 5 นาที
           </p>
         </div>
         <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:min-w-[420px]">
@@ -85,6 +86,8 @@ export default function AlertsPage() {
           <StatCard label="ถึงเป้าแล้ว" value={triggered.length} accent="warning" />
         </div>
       </div>
+
+      <DataFreshnessNotice />
 
       {triggered.length > 0 && (
         <section className="glass-card rounded-2xl p-5 border border-warning/30 bg-warning/5 space-y-3">

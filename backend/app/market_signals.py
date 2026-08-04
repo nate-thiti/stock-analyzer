@@ -8,7 +8,9 @@ import pandas as pd
 from sqlalchemy.orm import Session
 
 from .schemas import SignalItem, MarketSignalsResponse
-from .services import get_stock_history, get_stock_quote, get_fundamental_metrics
+from .services import (
+    get_stock_history, get_stock_quotes, get_fundamental_metrics, resolve_symbol_profile,
+)
 from .analysis import (
     calculate_fundamental_analysis,
     calculate_technical_analysis,
@@ -90,14 +92,13 @@ def _history_to_df(history) -> pd.DataFrame:
     return df
 
 
-def _analyze_one(symbol: str) -> Optional[SignalItem]:
+def _analyze_one(symbol: str, quote=None) -> Optional[SignalItem]:
     try:
         history = get_stock_history(symbol, "6mo", "1d")
         if not history:
             return None
 
         df = _history_to_df(history)
-        quote = get_stock_quote(symbol)
         current_price = quote.price if quote else float(df["Close"].iloc[-1])
         currency = quote.currency if quote else "USD"
 
@@ -124,9 +125,16 @@ def _analyze_one(symbol: str) -> Optional[SignalItem]:
         if display_action not in ("buy", "hold", "sell"):
             return None
 
+        name = quote.name if quote and quote.name != symbol.upper() else None
+        if not name:
+            try:
+                name, _sector = resolve_symbol_profile(symbol)
+            except Exception:
+                name = None
+
         return SignalItem(
             symbol=symbol.upper(),
-            name=quote.name if quote else None,
+            name=name,
             current_price=current_price,
             currency=currency,
             change_percent=quote.change_percent if quote else None,
@@ -196,8 +204,9 @@ def _apply_personal_context(items: List[SignalItem], context: dict) -> None:
 
 def _build_market_signals(watchlist: List[str], resolved_scope: str, context: dict) -> MarketSignalsResponse:
     items: List[SignalItem] = []
+    quotes, _quote_errors = get_stock_quotes(watchlist)
     with ThreadPoolExecutor(max_workers=4) as pool:
-        futures = {pool.submit(_analyze_one, sym): sym for sym in watchlist}
+        futures = {pool.submit(_analyze_one, sym, quotes.get(sym)): sym for sym in watchlist}
         for fut in as_completed(futures):
             result = fut.result()
             if result:

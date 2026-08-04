@@ -1,6 +1,6 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Globe2 } from 'lucide-react';
+import { DatabaseZap, Globe2, ShieldCheck, Sparkles } from 'lucide-react';
 import { BrandLockup } from '../BrandLogo';
 import ThemeToggle from '../ThemeToggle';
 
@@ -23,12 +23,12 @@ function SceneFallback() {
   );
 }
 
-function VisualPanel({ tagline }) {
+function VisualPanel({ tagline, description, sceneVariant }) {
   return (
     <div className="relative overflow-hidden min-h-dvh">
       <SoftOrbs />
       <Suspense fallback={<SceneFallback />}>
-        <AuthScene3D className="absolute inset-0 z-0" />
+        <AuthScene3D variant={sceneVariant} className="absolute inset-0 z-0" />
       </Suspense>
       <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/15 to-background/40 pointer-events-none z-[1]" />
       <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-background/30 pointer-events-none z-[1]" />
@@ -46,14 +46,31 @@ function VisualPanel({ tagline }) {
 
         <div className="flex-1" aria-hidden="true" />
 
-        <div className="pb-4">
-          <h2 className="text-2xl xl:text-[1.85rem] font-bold text-foreground leading-snug max-w-[20rem]">
+        <div className="pb-5">
+          <div className="mx-auto mb-3 inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-background/45 px-3 py-1 text-xs font-medium text-primary backdrop-blur-xl">
+            <Sparkles size={13} /> Interactive market intelligence
+          </div>
+          <h2 className="max-w-[24rem] text-2xl font-black leading-tight text-foreground xl:text-4xl">
             {tagline}
           </h2>
-          <p className="text-xs text-muted mt-2 max-w-[18rem] mx-auto leading-relaxed">
-            กราฟแท่งเทียน 3D · วิเคราะห์ · พอร์ต · แจ้งเตือนราคา
+          <p className="mx-auto mt-3 max-w-[25rem] text-sm leading-relaxed text-muted">
+            {description}
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function MobileVisual({ sceneVariant }) {
+  return (
+    <div className="relative mb-5 h-44 overflow-hidden rounded-3xl border border-primary/20 bg-primary/[0.04] sm:h-52 lg:hidden">
+      <Suspense fallback={<SceneFallback />}>
+        <AuthScene3D compact variant={sceneVariant} className="absolute inset-0" />
+      </Suspense>
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/55 via-transparent to-transparent" />
+      <div className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-background/60 px-2.5 py-1 text-xs font-medium text-primary backdrop-blur-xl">
+        <Sparkles size={12} /> 3D interactive
       </div>
     </div>
   );
@@ -64,38 +81,75 @@ export default function AuthPageLayout({
   subtitle,
   icon: Icon,
   tagline,
+  description,
+  helperText = 'เข้าถึงข้อมูลวิเคราะห์ พอร์ต และการแจ้งเตือนของคุณ',
+  sceneVariant = 'core',
   children,
 }) {
+  const [isDesktop, setIsDesktop] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+  ));
+
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsDesktop(query.matches);
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
   return (
-    <div className="min-h-dvh w-full min-w-0 overflow-x-clip relative">
+    <div className="relative min-h-dvh w-full min-w-0 overflow-x-clip">
+      <SoftOrbs />
+      <div className="grid-overlay pointer-events-none absolute inset-0 opacity-50" />
       <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-30">
         <ThemeToggle />
       </div>
 
-      <div className="lg:grid lg:grid-cols-2 lg:min-h-dvh">
-        <div className="relative z-10 flex flex-col justify-center items-center px-4 sm:px-8 py-10 lg:py-12 min-h-dvh lg:min-h-0">
-          <div className="w-full max-w-[380px]">
-            <div className="flex justify-center mb-8 lg:mb-10">
+      <div className="lg:grid lg:min-h-dvh lg:grid-cols-[0.88fr_1.12fr]">
+        <div className="relative z-10 flex min-h-dvh flex-col items-center justify-center px-4 py-8 sm:px-8 lg:min-h-0 lg:py-12">
+          <div className="w-full max-w-[430px]">
+            <div className="mb-6 flex justify-center lg:mb-8">
               <Link to="/" className="inline-block opacity-90 hover:opacity-100 transition-opacity">
                 <BrandLockup iconSize={40} />
               </Link>
             </div>
 
-            <div className="mb-6 lg:mb-7 lg:text-center">
-              <div className="flex items-center gap-2 text-primary/80 mb-1 lg:justify-center">
-                <Icon size={16} />
-                <span className="text-sm font-medium uppercase tracking-wide">{title}</span>
+            {!isDesktop && <MobileVisual sceneVariant={sceneVariant} />}
+
+            <div className="glass rounded-3xl p-5 shadow-2xl shadow-primary/5 sm:p-8">
+              <div className="mb-6">
+                <div className="mb-2 flex items-center gap-2 text-primary">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl border border-primary/20 bg-primary/10">
+                    <Icon size={16} />
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-[0.14em]">{title}</span>
+                </div>
+                <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">{subtitle}</h1>
+                <p className="mt-1.5 text-sm text-muted">{helperText}</p>
               </div>
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground">{subtitle}</h1>
+
+              <div className="space-y-5">{children}</div>
             </div>
 
-            <div className="space-y-5">{children}</div>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[11px] text-muted">
+              <span className="inline-flex items-center justify-center gap-1 rounded-xl border border-border/50 bg-surface/40 px-2 py-2">
+                <ShieldCheck size={12} className="text-success" /> ปลอดภัย
+              </span>
+              <span className="inline-flex items-center justify-center gap-1 rounded-xl border border-border/50 bg-surface/40 px-2 py-2">
+                <DatabaseZap size={12} className="text-primary" /> Cache เร็ว
+              </span>
+              <span className="inline-flex items-center justify-center gap-1 rounded-xl border border-border/50 bg-surface/40 px-2 py-2">
+                <Globe2 size={12} className="text-accent" /> หุ้นทั่วโลก
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="hidden lg:block border-l border-border/30">
-          <VisualPanel tagline={tagline} />
-        </div>
+        {isDesktop && (
+          <div className="border-l border-border/30">
+            <VisualPanel tagline={tagline} description={description} sceneVariant={sceneVariant} />
+          </div>
+        )}
       </div>
     </div>
   );

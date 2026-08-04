@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from .services import PERIOD_MAP, get_provider_history, get_raw_financials, clean_symbol
+from .services import PERIOD_MAP, get_stock_history, get_raw_financials, clean_symbol
 
 
 def _parse_date(value: str) -> datetime:
@@ -89,8 +89,8 @@ def _lookup_ttm_eps(as_of: datetime, schedule: List[Tuple[datetime, float]]) -> 
 def build_pe_history(symbol: str, period: str = "2y") -> List[Dict[str, Any]]:
     cleaned = clean_symbol(symbol)
     yf_period = PERIOD_MAP.get(period, "2y")
-    df = get_provider_history(cleaned, period=yf_period, interval="1d")
-    if df is None or df.empty:
+    bars = get_stock_history(cleaned, yf_period, "1d")
+    if not bars:
         return []
 
     raw = get_raw_financials(cleaned)
@@ -99,15 +99,11 @@ def build_pe_history(symbol: str, period: str = "2y") -> List[Dict[str, Any]]:
         return []
 
     history: List[Dict[str, Any]] = []
-    for idx, row in df.iterrows():
-        if hasattr(idx, "to_pydatetime"):
-            as_of = idx.to_pydatetime()
-            if getattr(as_of, "tzinfo", None) is not None:
-                as_of = as_of.replace(tzinfo=None)
-        else:
-            as_of = _parse_date(str(idx))
-
-        price = float(row["Close"])
+    for bar in bars:
+        as_of = _parse_date(bar.time)
+        if getattr(as_of, "tzinfo", None) is not None:
+            as_of = as_of.replace(tzinfo=None)
+        price = float(bar.close)
         ttm_eps = _lookup_ttm_eps(as_of, schedule)
         pe = round(price / ttm_eps, 2) if ttm_eps and ttm_eps > 0 else None
 

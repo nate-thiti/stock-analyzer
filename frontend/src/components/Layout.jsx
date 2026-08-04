@@ -31,6 +31,10 @@ export default function Layout() {
     ? { to: '/admin', label: 'จัดการผู้ใช้', icon: Shield }
     : null;
 
+  const bottomNav = nav.filter(({ to }) => (
+    ['/', '/portfolio', '/compare', '/favorites', '/alerts'].includes(to)
+  ));
+
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
@@ -82,6 +86,8 @@ export default function Layout() {
                   key={to}
                   to={to}
                   className={navLinkClass(pathname === to, 'text-sm px-2 2xl:px-3 py-2 whitespace-nowrap')}
+                  title={label}
+                  aria-label={label}
                 >
                   <Icon size={14} className="icon-animate shrink-0" />
                   <span className="hidden 2xl:inline">{label}</span>
@@ -135,22 +141,6 @@ export default function Layout() {
 
           {/* Mobile / tablet */}
           <div className="flex xl:hidden items-center gap-1.5 sm:gap-2 shrink-0">
-            <Link
-              to="/alerts"
-              className={`relative p-2 rounded-xl border transition-colors ${
-                pathname === '/alerts'
-                  ? 'border-warning/40 bg-warning/10 text-warning'
-                  : 'border-border/60 bg-surface/60 text-muted hover:text-warning'
-              }`}
-              aria-label="แจ้งเตือนราคา"
-            >
-              {triggered.length > 0 ? <BellRing size={18} className="animate-pulse" /> : <Bell size={18} />}
-              {triggered.length > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 rounded-full bg-warning text-xs font-bold text-background flex items-center justify-center">
-                  {triggered.length > 9 ? '9+' : triggered.length}
-                </span>
-              )}
-            </Link>
             <SupportButton compact />
             <ThemeToggle />
             <button
@@ -220,11 +210,39 @@ export default function Layout() {
         </div>
       )}
 
-      <main className="flex-1 w-full min-w-0 max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 page-enter relative z-10">
+      <main className="relative z-10 mx-auto w-full min-w-0 max-w-[1440px] flex-1 px-3 pb-28 pt-4 sm:px-4 sm:pt-6 lg:px-6 xl:pb-6 page-enter">
         <Outlet />
       </main>
 
-      <footer className="relative z-10 shrink-0 border-t border-border/40 py-3 sm:py-4 text-center text-xs sm:text-sm text-muted backdrop-blur-sm px-3 sm:px-4 leading-relaxed">
+      {!menuOpen && <nav
+        className="fixed inset-x-2 bottom-2 z-50 grid grid-cols-5 rounded-2xl border border-border/70 bg-card/90 p-1.5 shadow-2xl shadow-black/20 backdrop-blur-2xl xl:hidden"
+        style={{ paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}
+        aria-label="เมนูหลักบนมือถือ"
+      >
+        {bottomNav.map(({ to, label, icon: Icon }) => {
+          const active = pathname === to;
+          return (
+            <Link
+              key={to}
+              to={to}
+              className={`relative flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-medium transition-colors ${
+                active ? 'bg-primary/12 text-primary' : 'text-muted hover:bg-surface hover:text-foreground'
+              }`}
+              aria-current={active ? 'page' : undefined}
+            >
+              <Icon size={18} strokeWidth={active ? 2.5 : 2} />
+              <span className="max-w-full truncate">{label}</span>
+              {to === '/alerts' && triggered.length > 0 && (
+                <span className="absolute right-[24%] top-1 min-w-4 rounded-full bg-warning px-1 text-[9px] font-black text-background">
+                  {triggered.length > 9 ? '9+' : triggered.length}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </nav>}
+
+      <footer className="relative z-10 mb-20 shrink-0 border-t border-border/40 px-3 py-3 text-center text-xs leading-relaxed text-muted backdrop-blur-sm sm:px-4 sm:py-4 sm:text-sm xl:mb-0">
         <BarChart3 size={12} className="inline mr-1 text-primary" />
         ข้อมูลจาก Yahoo Finance • ใช้เพื่อการศึกษา •{' '}
         <Link to="/guide" className="text-primary hover:underline">คู่มือการใช้งาน</Link>

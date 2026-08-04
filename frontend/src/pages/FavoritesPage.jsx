@@ -5,6 +5,7 @@ import { useBatchQuotes } from '../hooks/useBatchQuotes';
 import { usePriceAlerts } from '../hooks/usePriceAlerts';
 import PriceAlertButton, { AlertTriggeredBadge } from '../components/PriceAlertButton';
 import MarketStateBadge from '../components/MarketStateBadge';
+import DataFreshnessNotice from '../components/DataFreshnessNotice';
 
 export default function FavoritesPage() {
   const { favorites, loading: favLoading } = useFavorites();
@@ -21,6 +22,8 @@ export default function FavoritesPage() {
         </h2>
         <p className="text-sm text-muted mt-1">รายการหุ้นที่คุณบันทึกไว้</p>
       </div>
+
+      <DataFreshnessNotice />
 
       {triggered.length > 0 && (
         <Link

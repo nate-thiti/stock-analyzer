@@ -18,6 +18,9 @@ export function useBatchQuotes(symbols, { enabled = true, intervalMs = HOME_POLL
       const result = await api.quotes(symbolKey.split(','));
       setQuotes((current) => ({ ...current, ...(result.quotes || {}) }));
       setErrors(result.errors || {});
+      if (Object.keys(result.quotes || {}).length === 0 && Object.keys(result.errors || {}).length > 0) {
+        throw new Error('โหลดราคาหุ้นจาก Yahoo Finance ไม่สำเร็จ');
+      }
     } finally {
       setLoading(false);
     }
