@@ -92,6 +92,13 @@ export function clearApiCache(patterns = []) {
   }
 }
 
+function friendlyHttpError(status) {
+  if (status >= 500) return `เซิร์ฟเวอร์ไม่พร้อมใช้งานชั่วคราว (HTTP ${status}) — ลองใหม่อีกครั้งในอีกสักครู่`;
+  if (status === 404) return 'ไม่พบข้อมูลที่ต้องการ (HTTP 404)';
+  if (status === 429) return 'เรียกข้อมูลถี่เกินไป — รอสักครู่แล้วลองใหม่ (HTTP 429)';
+  return `เกิดข้อผิดพลาด (HTTP ${status})`;
+}
+
 async function fetchJSON(url, options = {}, { ttlMs = 0, shouldCache = null } = {}) {
   const cacheable = ttlMs > 0 && !options.method;
   if (cacheable) {
@@ -102,14 +109,19 @@ async function fetchJSON(url, options = {}, { ttlMs = 0, shouldCache = null } = 
   }
 
   const request = (async () => {
-    const res = await fetch(`${API_BASE}${url}`, {
-      credentials: 'include',
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
+    let res;
+    try {
+      res = await fetch(`${API_BASE}${url}`, {
+        credentials: 'include',
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+    } catch {
+      throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง');
+    }
     if (res.status === 401) {
       throw new AuthError('กรุณาเข้าสู่ระบบ');
     }
@@ -118,7 +130,7 @@ async function fetchJSON(url, options = {}, { ttlMs = 0, shouldCache = null } = 
       const detail = err.detail;
       const message = Array.isArray(detail)
         ? detail.map((d) => d.msg).join(', ')
-        : (detail || `HTTP ${res.status}`);
+        : (detail || friendlyHttpError(res.status));
       throw new Error(message);
     }
     if (res.status === 204) return null;
@@ -353,7 +365,7 @@ export function formatPnl(amount, pct, currency, { pctDecimals = 1 } = {}) {
 }
 
 export const EXTENDED_HOURS_LABEL = 'ก่อนตลาดเปิด';
-export const POST_MARKET_LABEL = 'ก่อนตลาดปิด';
+export const POST_MARKET_LABEL = 'หลังตลาดปิด';
 
 const MARKET_STATE_LABELS = {
   REGULAR: 'ตลาดเปิด',
