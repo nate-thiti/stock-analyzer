@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Globe, ArrowUpRight, ArrowDownRight, TrendingUp } from 'lucide-react';
-import { api, POPULAR_STOCKS } from '../api';
+import { Globe, ArrowUpRight, ArrowDownRight, TrendingUp } from 'lucide-react';
+import { POPULAR_STOCKS } from '../api';
 import { useBatchQuotes } from '../hooks/useBatchQuotes';
 import { useRiskProfile } from '../context/RiskProfileContext';
 import StarButton from '../components/StarButton';
@@ -11,11 +11,9 @@ import QuickCompareSection from '../components/QuickCompareSection';
 import RecentStocksSection from '../components/RecentStocksSection';
 import RiskProfileModal from '../components/RiskProfileModal';
 import DataFreshnessNotice from '../components/DataFreshnessNotice';
+import StockSearch from '../components/StockSearch';
 
 export default function HomePage() {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [riskModalOpen, setRiskModalOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,30 +31,9 @@ export default function HomePage() {
     }
   }, [needsSetup, profileLoading, location.state?.setupRisk, profile?.configured]);
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    const q = query.trim();
-    if (!q) return;
-    setLoading(true);
-    try {
-      const res = await api.search(q);
-      if (res.length === 1) {
-        navigate(`/stock/${res[0].symbol}`);
-      } else if (res.length > 0) {
-        setResults(res);
-      } else {
-        navigate(`/stock/${q.toUpperCase()}`);
-      }
-    } catch {
-      navigate(`/stock/${q.toUpperCase()}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-8 w-full min-w-0">
-      <section className="text-center py-6 sm:py-10 relative">
+      <section className="text-center py-6 sm:py-10 relative z-20">
         <h2 className="text-2xl sm:text-3xl lg:text-5xl font-black text-foreground mb-3 animate-fadeIn px-1">
           วิเคราะห์<span className="text-gradient">หุ้นทั่วโลก</span>
         </h2>
@@ -64,39 +41,10 @@ export default function HomePage() {
           คำนวณ P/E, PEG, P/S • วิเคราะห์ Technical • แนะนำซื้อ/ขาย • Stop Loss • แผนแบ่งซื้อ DCA
         </p>
 
-        <form onSubmit={handleSearch} className="relative max-w-xl mx-auto group">
-          <div className="absolute -inset-0.5 bg-gradient-primary rounded-2xl opacity-20 group-focus-within:opacity-60 blur transition-opacity duration-300" />
-          <input
-            type="text"
-            placeholder="ค้นหาหุ้น เช่น AAPL, PTT.BK, 0700.HK..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="relative w-full bg-surface border border-border rounded-2xl pl-12 pr-4 py-3.5 text-sm text-foreground placeholder-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-          />
-          <Search className="absolute left-4 top-4 text-muted" size={18} />
-          {loading && (
-            <div className="absolute right-4 top-4 w-5 h-5 border-2 border-primary border-t-transparent rounded-full icon-spin" />
-          )}
-        </form>
-
-        {results.length > 0 && (
-          <div className="max-w-xl mx-auto mt-3 glass-card rounded-xl overflow-hidden text-left animate-fadeIn">
-            {results.map((r) => (
-              <Link
-                key={r.symbol}
-                to={`/stock/${r.symbol}`}
-                className="flex items-center justify-between px-4 py-3 hover:bg-primary/5 border-b border-border/30 last:border-0 transition-colors"
-                onClick={() => setResults([])}
-              >
-                <div>
-                  <span className="font-mono font-bold text-foreground">{r.symbol}</span>
-                  <span className="text-xs text-muted ml-2">{r.name}</span>
-                </div>
-                <span className="text-xs text-muted">{r.exchange}</span>
-              </Link>
-            ))}
-          </div>
-        )}
+        <StockSearch className="max-w-xl mx-auto text-left" />
+        <p className="mt-3 hidden sm:block text-xs text-muted">
+          พิมพ์ชื่อบริษัทหรือสัญลักษณ์ — กด <kbd className="font-mono">/</kbd> หรือ <kbd className="font-mono">Ctrl K</kbd> เพื่อค้นหาจากหน้าไหนก็ได้
+        </p>
       </section>
 
       <DataFreshnessNotice />

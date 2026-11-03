@@ -364,7 +364,7 @@ export default function StockPage() {
                 <div className="h-16 flex items-center text-sm text-muted">กำลังโหลดราคา...</div>
               ) : null}
 
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
+              <div className="flex flex-row gap-2 w-full sm:w-auto shrink-0">
                 <SelectField
                   label="ช่วงเวลา"
                   value={period}

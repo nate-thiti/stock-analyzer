@@ -28,17 +28,8 @@ export default function SupportButton({ className = '', compact = false }) {
 
   const label = koFi ? 'Ko-fi' : 'Buy me a coffee';
 
-  if (!url) {
-    return (
-      <span
-        className={`${baseClass} opacity-45 cursor-not-allowed`}
-        title="ตั้ง BMC_URL ใน .env แล้ว restart backend"
-      >
-        <Coffee size={compact ? 16 : 14} className="shrink-0" />
-        {!compact && <span>สนับสนุน</span>}
-      </span>
-    );
-  }
+  // ยังไม่ตั้ง BMC_URL — ไม่แสดงปุ่มที่กดไม่ได้ให้ผู้ใช้เห็น
+  if (!url) return null;
 
   return (
     <a
