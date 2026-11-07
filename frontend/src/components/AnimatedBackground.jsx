@@ -22,7 +22,7 @@ export default function AnimatedBackground() {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const isMobile = window.innerWidth < 768;
 
-    const primary = cssVar('--primary', '#3b82f6');
+    const primary = cssVar('--primary', '#8b5cf6');
     const accent = cssVar('--accent', '#8b5cf6');
     const success = cssVar('--success', '#10b981');
 

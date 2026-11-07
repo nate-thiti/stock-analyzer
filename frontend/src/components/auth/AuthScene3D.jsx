@@ -187,7 +187,7 @@ export default function AuthScene3D({ compact = false, variant = 'core', classNa
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const palette = {
-      primary: cssVar('--primary', '#3b82f6'),
+      primary: cssVar('--primary', '#8b5cf6'),
       accent: cssVar('--accent', '#8b5cf6'),
       success: cssVar('--success', '#10b981'),
     };

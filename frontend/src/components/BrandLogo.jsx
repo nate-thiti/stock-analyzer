@@ -2,8 +2,8 @@ const MARKUP = (
   <>
     <defs>
       <linearGradient id="brand-bg" x1="4" y1="28" x2="28" y2="4" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#2563eb" />
-        <stop offset="1" stopColor="#7c3aed" />
+        <stop stopColor="#7c3aed" />
+        <stop offset="1" stopColor="#db2777" />
       </linearGradient>
       <linearGradient id="brand-line" x1="6" y1="22" x2="26" y2="8" gradientUnits="userSpaceOnUse">
         <stop stopColor="#ffffff" stopOpacity="0.5" />
