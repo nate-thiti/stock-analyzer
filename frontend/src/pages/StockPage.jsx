@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowUpRight, ArrowDownRight, AlertTriangle, Building2,
   GitCompare, Info, BarChart3, Percent, Coins, Layers, Loader2, Clock, Radio, Briefcase,
@@ -51,6 +51,7 @@ function ExtendedPriceInline({ label, price, change, changePercent, currency }) 
 
 export default function StockPage() {
   const { symbol } = useParams();
+  const navigate = useNavigate();
   const [quote, setQuote] = useState(null);
   const [info, setInfo] = useState(null);
   const [infoLoading, setInfoLoading] = useState(true);
@@ -139,9 +140,20 @@ export default function StockPage() {
         setQuote(q);
         setHistory(h.history || []);
       })
-      .catch((err) => setError(err.message))
+      .catch(async (err) => {
+        // Thai tickers typed without the market suffix (PTT → PTT.BK).
+        if (!symbol.includes('.') && !symbol.startsWith('^')) {
+          const thaiSymbol = `${symbol.toUpperCase()}.BK`;
+          const thaiQuote = await api.quote(thaiSymbol).catch(() => null);
+          if (thaiQuote) {
+            navigate(`/stock/${encodeURIComponent(thaiSymbol)}`, { replace: true });
+            return;
+          }
+        }
+        setError(err.message);
+      })
       .finally(() => setChartLoading(false));
-  }, [symbol, period, candleInterval]);
+  }, [symbol, period, candleInterval, navigate]);
 
   useEffect(() => {
     if (!symbol) return;

@@ -17,6 +17,15 @@ RAW_CACHE_EXPIRY = int(os.getenv("RAW_CACHE_SECONDS", "86400"))
 EVENT_CACHE_EXPIRY = int(os.getenv("EVENT_CACHE_SECONDS", "86400"))
 STALE_CACHE_EXPIRY = int(os.getenv("STALE_CACHE_SECONDS", "3600"))
 RAW_STALE_CACHE_EXPIRY = int(os.getenv("RAW_STALE_CACHE_SECONDS", "86400"))
+# Yahoo sometimes answers with a sparse profile (no name/sector/summary). Keep
+# such results only briefly so the next visit retries instead of pinning the
+# degraded card for a whole day.
+RAW_PARTIAL_CACHE_EXPIRY = int(os.getenv("RAW_PARTIAL_CACHE_SECONDS", "300"))
+
+try:
+    from yfinance.exceptions import YFTickerMissingError
+except ImportError:  # older yfinance
+    YFTickerMissingError = None
 YAHOO_TIMEOUT_SECONDS = float(os.getenv("YAHOO_TIMEOUT_SECONDS", "12"))
 YAHOO_MAX_WORKERS = int(os.getenv("YAHOO_MAX_WORKERS", "6"))
 _provider_pool = ThreadPoolExecutor(max_workers=YAHOO_MAX_WORKERS, thread_name_prefix="yahoo")
@@ -36,6 +45,12 @@ class MarketDataRateLimitError(MarketDataError):
 class MarketDataTimeoutError(MarketDataError):
     status_code = 503
     retry_after = 30
+
+
+class SymbolNotFoundError(MarketDataError):
+    """Yahoo has no such ticker — a user input problem, not a provider outage."""
+    status_code = 404
+    retry_after = 3600
 
 
 def _is_rate_limit_error(error: BaseException) -> bool:
@@ -62,6 +77,12 @@ def _provider_call(label: str, operation: Callable[[], T]) -> T:
     except MarketDataError:
         raise
     except Exception as error:
+        if YFTickerMissingError is not None and isinstance(error, YFTickerMissingError):
+            symbol = label.split(":", 1)[-1].split("_", 1)[0]
+            hint = ""
+            if "." not in symbol and not symbol.startswith("^"):
+                hint = f" — ถ้าเป็นหุ้นไทยให้ใช้ {symbol}.BK"
+            raise SymbolNotFoundError(f"ไม่พบหุ้น '{symbol}' บน Yahoo Finance{hint}") from error
         if _is_rate_limit_error(error):
             raise MarketDataRateLimitError(
                 "ผู้ให้บริการข้อมูลจำกัดจำนวนคำขอ กรุณาลองใหม่ภายหลัง"
@@ -330,9 +351,28 @@ def _dividends_from_yf(ticker) -> List[dict]:
         return []
 
 
+def _info_has_profile(info: dict) -> bool:
+    return bool(
+        info.get("longBusinessSummary")
+        or pick_info_str(info, "sector", "sectorDisp", "industry", "industryDisp")
+    )
+
+
+def raw_has_profile(raw: RawFinancials) -> bool:
+    return bool(raw.summary or raw.sector or raw.industry)
+
+
 def _fetch_raw_data(cleaned: str) -> RawFinancials:
     ticker = _get_ticker(cleaned)
     info = _ticker_info(ticker)
+    if not _info_has_profile(info):
+        # A sparse payload usually means Yahoo's quoteSummary call failed (stale
+        # crumb/session). One retry on a fresh Ticker normally recovers it.
+        _ticker_cache.pop(cleaned, None)
+        ticker = _get_ticker(cleaned)
+        retry_info = _ticker_info(ticker)
+        if _info_has_profile(retry_info) or len(retry_info) > len(info):
+            info = retry_info
 
     def partial(operation, fallback):
         try:
@@ -375,9 +415,11 @@ def _fetch_raw_data(cleaned: str) -> RawFinancials:
 def get_raw_financials(symbol: str) -> RawFinancials:
     cleaned = clean_symbol(symbol)
 
-    cached = _cached(raw_cache, cleaned, RAW_CACHE_EXPIRY)
-    if cached is not None:
-        return cached
+    entry = raw_cache.get(cleaned)
+    if entry is not None:
+        max_age = RAW_CACHE_EXPIRY if entry.get("complete", True) else RAW_PARTIAL_CACHE_EXPIRY
+        if time.time() - entry["timestamp"] < max_age:
+            return entry["data"]
 
     with _inflight_lock:
         if cleaned in _inflight_raw:
@@ -403,7 +445,15 @@ def get_raw_financials(symbol: str) -> RawFinancials:
             if stale is not None:
                 return stale
             raise
-        raw_cache[cleaned] = {"timestamp": time.time(), "data": raw}
+        complete = raw_has_profile(raw)
+        if not complete:
+            previous = raw_cache.get(cleaned)
+            if previous is not None and previous.get("complete", True):
+                # Prefer an older full profile over today's sparse answer (the
+                # business profile rarely changes and ratios use the live price);
+                # leave its timestamp alone so the next visit retries.
+                return previous["data"]
+        raw_cache[cleaned] = {"timestamp": time.time(), "data": raw, "complete": complete}
         return raw
     finally:
         with _inflight_lock:

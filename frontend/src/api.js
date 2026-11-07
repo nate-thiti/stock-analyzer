@@ -204,7 +204,12 @@ export const api = {
           && Object.keys(data?.errors || {}).length === 0,
       },
     ),
-  info: (symbol) => fetchJSON(`/stock/info?symbol=${encodeURIComponent(symbol)}`, {}, { ttlMs: ONE_DAY }),
+  // A sparse Yahoo profile (no sector/summary) must not stick for a day — the
+  // next visit should retry. shouldCache also evicts such entries cached earlier.
+  info: (symbol) => fetchJSON(`/stock/info?symbol=${encodeURIComponent(symbol)}`, {}, {
+    ttlMs: ONE_DAY,
+    shouldCache: (data) => Boolean(data?.summary || data?.sector || data?.industry),
+  }),
   history: (symbol, period, interval) =>
     fetchJSON(`/stock/history?symbol=${encodeURIComponent(symbol)}&period=${period}&interval=${interval}`, {}, { ttlMs: FIVE_MINUTES }),
   search: (q) => fetchJSON(`/stock/search?q=${encodeURIComponent(q)}`, {}, { ttlMs: ONE_DAY }),

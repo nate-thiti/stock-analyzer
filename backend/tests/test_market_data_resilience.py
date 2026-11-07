@@ -96,6 +96,63 @@ def test_company_info_falls_back_to_quote_when_financials_are_limited(monkeypatc
     assert info.currency == "USD"
 
 
+def test_unknown_ticker_is_http_404_with_thai_hint():
+    from yfinance.exceptions import YFTickerMissingError
+
+    def missing():
+        raise YFTickerMissingError("PTT", "no data found")
+
+    try:
+        services._provider_call("quote:PTT", missing)
+        raise AssertionError("expected SymbolNotFoundError")
+    except services.SymbolNotFoundError as error:
+        assert "PTT.BK" in str(error)
+        response = asyncio.run(market_data_error_handler(None, error))
+        assert response.status_code == 404
+
+
+def _raw(symbol: str, complete: bool):
+    from app.fundamentals import RawFinancials
+    return RawFinancials(
+        symbol=symbol,
+        name="NVIDIA Corporation" if complete else None,
+        sector="Technology" if complete else None,
+        summary="GPUs" if complete else None,
+        market_cap=4.5e12,
+    )
+
+
+def test_partial_company_profile_is_retried_after_short_window(monkeypatch):
+    services.raw_cache.clear()
+    responses = [_raw("NVDA", False), _raw("NVDA", True)]
+    calls = []
+
+    def provider(label, _operation):
+        calls.append(label)
+        return responses[len(calls) - 1]
+
+    monkeypatch.setattr(services, "_provider_call", provider)
+
+    assert services.get_raw_financials("NVDA").sector is None
+    assert services.get_raw_financials("NVDA").sector is None  # short cache hit
+    assert len(calls) == 1
+
+    services.raw_cache["NVDA"]["timestamp"] -= services.RAW_PARTIAL_CACHE_EXPIRY + 1
+    assert services.get_raw_financials("NVDA").sector == "Technology"
+    assert len(calls) == 2
+    assert services.raw_cache["NVDA"]["complete"] is True
+
+
+def test_partial_profile_does_not_replace_older_full_profile(monkeypatch):
+    services.raw_cache.clear()
+    old_ts = time.time() - services.RAW_CACHE_EXPIRY - 10
+    services.raw_cache["NVDA"] = {"timestamp": old_ts, "data": _raw("NVDA", True), "complete": True}
+    monkeypatch.setattr(services, "_provider_call", lambda _label, _op: _raw("NVDA", False))
+
+    assert services.get_raw_financials("NVDA").summary == "GPUs"
+    assert services.raw_cache["NVDA"]["timestamp"] == old_ts
+
+
 def test_market_signals_first_request_only_schedules_background_refresh(monkeypatch):
     from app import market_signals
     scheduled = []
